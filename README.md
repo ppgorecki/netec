@@ -33,12 +33,12 @@ metaec_multiset.sh -R50 -N100 -j6 -o sim_out -d data_sim data_sim/wgd-[1-5]-*_0*
 ```
 
 Here: 
- - '-R 50' - randomize from binom(n,k)>50 in the main loop
- - '-N 100' - stop if DP will not improve after 100 executions
- - '-j 10' - run 10 jobs in parallel
- - '-o DIR' - store results in directory DIR
- - '-d DIR' - input directory 
- - `data_sim/wgd-[1-5]-*_0*` - files to process
+- '-R 50' - randomize from binom(n,k)>50 in the main loop
+- '-N 100' - stop if DP will not improve after 100 executions
+- '-j 10' - run 10 jobs in parallel
+- '-o DIR' - store results in directory DIR
+- '-d DIR' - input directory 
+- `data_sim/wgd-[1-5]-*_0*` - files to process
 
 If the analysis is interrupted, running the command again will resume processing from where it left off.
 
@@ -52,3 +52,7 @@ metaec_multiset.sh
 For questions contact:
 
 <gorecki@mimuw.edu.pl>
+
+### Funding
+
+The support was provided by National Science Centre grant #2019/33/B/ST6/00737.
