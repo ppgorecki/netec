@@ -17,7 +17,7 @@ Usage: $0 [-r] [-h] [-d DATADIR] [-j NUM] [-o DIR] [-f] [-c] [-R RANDOMIZE_FROM]
 
 -h Display help information.
 -r Perform reverse climb.
--o DIR Output directory (default: $RES).
+-o DIR Output directory (default: resultsTmp_$(basename $DATADIR)).
 -d DATADIR Data directory (default: $DATADIR).
 -j NUM Number of jobs to use (default: $JOBS).
 -f Force recomputation of all data (do not skip already computed).
@@ -31,13 +31,15 @@ Process yeast dataset:
 $0 -R50 -N50 -j10 -o yeast_out -d data_yeast data_yeast/gtrees_0.[0-6]*
 
 Process simulated dataset:
-$0 -R50 -N100 -j60 -o sim_out data_sim/wgd--_0*
+$0 -R50 -N100 -j6 -o sim_out -d data_sim data_sim/wgd-[1-5]-*_0*
 
 If the analysis is interrupted, running the command again will resume processing from where it left off.
 
 EOF
 
 } 
+
+[[ $* ]] || { Usage && exit -1 ;  }
 
 set -- $( getopt hro:d:j:fcN:R: $* )
 
