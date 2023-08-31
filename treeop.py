@@ -332,6 +332,9 @@ class Tree:
     def rfcost(self, stree):
         return len(self.clusters().symmetric_difference(stree.clusters()))
 
+    def unknownlabels(self):
+        return [ l for l in self.leaves() if l.clusterleaf[0]=='?' ]
+
     def dupcost(self, stree):
         d = 0
         for n in self.nodes:

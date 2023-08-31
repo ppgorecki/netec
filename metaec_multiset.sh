@@ -33,6 +33,13 @@ $0 -R50 -N50 -j10 -o yeast_out -d data_yeast data_yeast/gtrees_0.[0-6]*
 Process simulated dataset:
 $0 -R50 -N100 -j6 -o sim_out -d data_sim data_sim/wgd-[1-5]-*_0*
 
+Output: 5 files sim_out/sim[1-5].txt + wgd.csv
+
+Process simulated dataset (inferred):
+$0 -R50 -N100 -j6 -o sim_inferred_out -d data_sim_inferred data_sim_inferred/wgd-[1-5]-*_0.[0-5]*
+
+Output: 5 files sim_inferred_out/sim[1-5].txt + wgd.csv
+
 If the analysis is interrupted, running the command again will resume processing from where it left off.
 
 EOF
@@ -123,17 +130,18 @@ csvmanip/csvmanip.py  -i "genetree,speciestree,outgenetree,outspeciestree,climbs
 
 echo $RES/wgd.csv created
 
-if [[ $DATADIR = data_sim ]]
+if [[ $DATADIR = data_sim ]] ||  [[ $DATADIR = data_sim_inferred ]]
 then
 
 	for i in 1 2 3 4 5
 	do
-		csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id,Source" -q -H $RES/wgd-$i*_0.[0-7]*.dat > $RES/sim_wgd$i.txt
+		csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id" -q -H $RES/wgd-$i*_0.[0-7]*.dat > $RES/sim_wgd$i.txt
 		echo $RES/sim_wgd$i.txt created
 	done
 else
 
-	csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id,Source" -q -H $RES/*.dat > $RES/wgd.txt
+	#csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id,Source" -q -H $RES/*.dat > $RES/wgd.txt
+	csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id" -q -H $RES/*.dat > $RES/wgd.txt
 
 	echo $RES/wgd.txt created
 

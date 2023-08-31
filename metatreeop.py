@@ -311,6 +311,10 @@ def count_wgd_nodes(
 
     best_cost, best_wgd_nodes = rec([Tree(str2tree(gt_inferred_str))], st)
 
+    if outfile:
+        with open(outfile+".genetree","w") as f:
+            f.write(gt_inferred_str)
+
     outstats = f"initialgenetree={initial_gene_tree}\ninitialgenetreecost={best_cost}\n"
 
     fixed_wgd_nodes = fixedec(gt, st)
@@ -322,7 +326,8 @@ def count_wgd_nodes(
         print(gt)
         print(st.root.markrepr(fixed_wgd_nodes))
 
-    outstats+=f"setid=\"{setid}\"\ngenetree=\"{gt}\"\nspeciestree=\"{st}\"\nspeciestreefixedwgd=\"{st.root.markrepr(fixed_wgd_nodes)}\"\nfixedwgd={len(fixed_wgd_nodes)}\n\nreversed_climb={reversed_climb}\n\n"
+    unklabs = len(gt.unknownlabels())
+    outstats+=f"setid=\"{setid}\"\ngenetree=\"{gt}\"\nspeciestree=\"{st}\"\nspeciestreefixedwgd=\"{st.root.markrepr(fixed_wgd_nodes)}\"\nfixedwgd={len(fixed_wgd_nodes)}\n\nreversed_climb={reversed_climb}\n\nunknownlabels={unklabs}\n\n"
         
 
     climbs=""
@@ -334,7 +339,13 @@ def count_wgd_nodes(
 
     sampling_occured = False
     dpfromlastimprovement = 0
-    while True:
+
+    if not unklabs:
+        exactsolution = True
+
+
+
+    while unklabs:
 
         if reversed_climb:
             if cur_cost_search == best_cost: 
@@ -348,8 +359,8 @@ def count_wgd_nodes(
         comb = math.comb(len(potential_wgd_nodes),k)
 
         samplingsets = not (not randomize_from or randomize_from>comb)
-
-        print(f"[{setid}] EC:{best_cost}/{maxec} Test:{k+len(fixed_wgd_nodes)} FixedWgd:{len(fixed_wgd_nodes)} PotentialEpi:{len(potential_wgd_nodes)} K:{k} Combinations:{comb} RndSampling:{samplingsets} StopAfter:{noimprovement_stop}")
+  
+        print(f"[{setid}] EC:{best_cost}/{maxec} Test:{k+len(fixed_wgd_nodes)} FixedWgd:{len(fixed_wgd_nodes)} PotentialEpi:{len(potential_wgd_nodes)} K:{k} Combinations:{comb} RndSampling:{samplingsets} StopAfter:{noimprovement_stop} UnknownLabels:{unklabs}")
 
         if samplingsets:
             wgd_node_sets = randcombinations(potential_wgd_nodes, k)
@@ -408,6 +419,6 @@ def count_wgd_nodes(
             break
 
 
-    outstats+=f"bestcost={best_cost}\ndpcalls={dpcalls}\nclimbs={climbs}\noutgenetree=\"{gt_inferred_str}\"\noutspeciestree=\"{st.root.markrepr(best_wgd_nodes)}\"\noutspeciestreeepicount=\"{st.root.attrrepr('episize')}\"\nsamplingsets={samplingsets}\nexactsolution={exactsolution}\n"
+    outstats+=f"bestcost={best_cost}\ndpcalls={dpcalls}\nclimbs={climbs}\noutgenetree=\"{gt_inferred_str}\"\noutspeciestree=\"{st.root.markrepr(best_wgd_nodes)}\"\noutspeciestreeepicount=\"{st.root.attrrepr('episize')}\"\nsamplingsets={samplingsets}\nexactsolution={exactsolution}\nunknownlabels={unklabs}\n"
         
     return best_cost, best_wgd_nodes, exactsolution, outstats
