@@ -30,7 +30,7 @@ def fixedec(genetree: Tree, speciestree: Tree) -> Set[Node]:
 			if g.clusterleaf[0] == '?':
 				return (True,frozenset(),None, False)
 			else:
-				return (False,frozenset([g.clusterleaf]),lab2leaf[g.clusterleaf], False)				
+				return (False, frozenset([g.clusterleaf]), lab2leaf[g.clusterleaf], False)				
 		 
 		hasunk, labels, stmap, dupl = False, frozenset(), None, False
 		chmaps = [] # all maps

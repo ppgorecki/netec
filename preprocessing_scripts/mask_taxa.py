@@ -11,9 +11,13 @@ def clear_taxa(g: Tree, p: float) -> Tree:
     return g
 
 
-thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-repeats = 10
-tree_files = ["../data_yeast/gtrees"] + [f"../data_sim/wgd-{i}-gene-trees" for i in [1, 2, 3, 4, 5]]
+thresholds = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6] #, 0.6, 0.7, 0.8, 0.9, 1]
+#thresholds = [0.0] # , 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+repeats = 100
+# tree_files = ["../data_yeast/gtrees"] + [f"../data_sim/wgd-{i}-gene-trees" for i in [1, 2, 3, 4, 5]]
+
+#tree_files = [f"../data_sim_inferred/wgd-{i}-rooted-gene-trees" for i in [1, 2, 3, 4, 5]]
+tree_files = [f"../data_sim_inferred/wgd-{i}-rooted-gene-trees" for i in [1, 2, 3, 4, 5]]
 for threshold in thresholds:
     for i in range(repeats):
         for tree_file in tree_files:

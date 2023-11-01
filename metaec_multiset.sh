@@ -112,7 +112,7 @@ function singledataset()
 			fi
 		fi
 
-	python3 metaec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile $CONT $REVERSE_CLIMB
+	python3 metaec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile --distribution_maps $CONT $REVERSE_CLIMB
 	
 	echo $GENETREES completed 
 	
@@ -133,7 +133,7 @@ echo $RES/wgd.csv created
 if [[ $DATADIR = data_sim ]] ||  [[ $DATADIR = data_sim_inferred ]]
 then
 
-	for i in 1 2 3 4 5
+	for i in 0 1 2 3 4 5
 	do
 		csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id" -q -H $RES/wgd-$i*_0.[0-7]*.dat > $RES/sim_wgd$i.txt
 		echo $RES/sim_wgd$i.txt created
