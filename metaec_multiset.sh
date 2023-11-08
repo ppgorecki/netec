@@ -103,15 +103,17 @@ function singledataset()
 		fi
 	fi
 
+
 	if [[ ! $CONTINUE ]] && [[ -f $outfile ]] && ! [[ $FORCE ]]
 		then
-			if grep outspeciestreeepicount $outfile
+			if grep outspeciestree_worec $outfile
 			then
 				echo $GENETREES already completed
 				return 
 			fi
 		fi
 
+	#echo "python3 metaec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile --distribution_maps $CONT $REVERSE_CLIMB"
 	python3 metaec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile --distribution_maps $CONT $REVERSE_CLIMB
 	
 	echo $GENETREES completed 
@@ -130,18 +132,17 @@ csvmanip/csvmanip.py  -i "genetree,speciestree,outgenetree,outspeciestree,climbs
 
 echo $RES/wgd.csv created
 
-if [[ $DATADIR = data_sim ]] ||  [[ $DATADIR = data_sim_inferred ]]
+if [[ "$DATADIR" =~ data_sim ]] 
 then
-
 	for i in 0 1 2 3 4 5
 	do
-		csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id" -q -H $RES/wgd-$i*_0.[0-7]*.dat > $RES/sim_wgd$i.txt
+		csvmanip/csvmanip.py  -e "outspeciestree_worec" -i "Id" -q -H $RES/wgd-$i*_0.[0-7]*.dat > $RES/sim_wgd$i.txt
 		echo $RES/sim_wgd$i.txt created
 	done
 else
 
 	#csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id,Source" -q -H $RES/*.dat > $RES/wgd.txt
-	csvmanip/csvmanip.py  -e "outspeciestreeepicount" -i "Id" -q -H $RES/*.dat > $RES/wgd.txt
+	csvmanip/csvmanip.py  -e "outspeciestree_worec" -i "Id" -q -H $RES/*.dat > $RES/wgd.txt
 
 	echo $RES/wgd.txt created
 

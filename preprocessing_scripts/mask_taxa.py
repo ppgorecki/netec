@@ -17,7 +17,9 @@ repeats = 100
 # tree_files = ["../data_yeast/gtrees"] + [f"../data_sim/wgd-{i}-gene-trees" for i in [1, 2, 3, 4, 5]]
 
 #tree_files = [f"../data_sim_inferred/wgd-{i}-rooted-gene-trees" for i in [1, 2, 3, 4, 5]]
-tree_files = [f"../data_sim_inferred/wgd-{i}-rooted-gene-trees" for i in [1, 2, 3, 4, 5]]
+#dir=f"../data_sim_inferred/"
+dir=f"../dsif/"
+tree_files = [f"{dir}wgd-{i}-rooted-gene-trees" for i in [0, 1, 2, 3, 4, 5]]
 for threshold in thresholds:
     for i in range(repeats):
         for tree_file in tree_files:
