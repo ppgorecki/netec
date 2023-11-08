@@ -1,7 +1,7 @@
 import itertools
 import math
 from treeop import Tree, str2tree
-
+from leafdistr import emptyleafcounts, leafcountsupdate
 
 # return left child
 def get_left(n):
@@ -46,10 +46,14 @@ def generate_intervals(gt, st):
 
 # generates intervals for gene tree nodes
 def init(gtrees, st):
-    for gt in gtrees:
+    for i, gt in enumerate(gtrees):
         gt.set_lca_mapping(st)
         generate_intervals(gt, st)
-
+        # set ids of gene nodes
+        gt.gtid = i
+        for g in gt.nodes:
+            g.gtid = i
+            
 
 # input : set of gene trees (gtrees), species tree (st)
 # output : minimal EC score, list of nodes with episodes for that score
@@ -71,6 +75,7 @@ def rec(gtrees, st):
         s.active = False
         s.min_len_int = math.inf
         s.episize = 0
+        s.epigtcount = 0
 
     for g in dup:
         g.interval[0].botinterval.append(g)
@@ -89,6 +94,8 @@ def rec(gtrees, st):
                 for i in s.botinterval:
                     i.interval[1].topinterval.remove(i)  # starting interval is removed from interval top list
             s.episize = len(s.allintervals) + len(s.botinterval)
+            gtids = set(g.gtid for g in s.allintervals).union(g.gtid for g in s.botinterval )
+            s.epigtcount = len(gtids) # the number of gene trees participating in the episode
         else:
             if s.botinterval:       # add to parent all intervals that start here
                 for i in s.botinterval:
@@ -132,7 +139,56 @@ def ecfeasbible(gt, st, episodes) -> bool:
 
     return False
 
-def metaecfeasible(gt, st, episodes) -> bool:
+def metaecfeasible(gt, st, episodes, leafdistr=False) -> (bool, int, dict):
+    """
+    Given a partial gene tree and a species tree 
+    check if there is a gene tree gt' that extends gt 
+    s.t. duplications from gt' can be placed at episodes 
+
+    Returns triple (feasible, cnt, leafdistributions):
+        feasible: bool - true if the scenario is feasible
+        cnt: int - if leafdistr is True, the number of feasible leaf-mapping reconstructions 
+        leafdistributions: dict - if leafdistr is True, per each unknown leaf the distribution of species leaf reconstruction in feasible mappings 
+    """
+
+    gts = str(gt)
+    cnt = gts.count("?")
+
+    guls = [ g for g in gt.leaves() if g.clusterleaf == '?' ]
+
+    if leafdistr:
+        feascnt = 0        
+        leafcounts = emptyleafcounts(guls, st.leaves())
+
+    if not guls:
+        res =  ecfeasbible(gt,st,episodes)                
+        return res, int(res), {}
+
+
+    for p in itertools.product(st.leaves(), repeat=cnt):
+        cgt = gts
+        
+        for lb in p:
+            cgt = cgt.replace("?", lb.clusterleaf, 1)                    
+
+        res = ecfeasbible(t:=Tree(str2tree(cgt)),st,episodes)        
+
+        if leafdistr:
+            if res:
+                # aggregate 
+                leafcountsupdate(leafcounts, p)
+                feascnt += 1
+
+        elif res:
+            return res, 1, {} # return the first
+
+    if leafdistr and feascnt:
+        return True, feascnt, dict(zip(guls,leafcounts))
+
+    return False, 0, {}
+
+
+def metaecfeasibleleafmap(gt, st, episodes) -> bool:
     """
     Given a partial gene tree and a species tree 
     check if there is a gene tree gt' that extends gt 
@@ -141,8 +197,9 @@ def metaecfeasible(gt, st, episodes) -> bool:
     gts = str(gt)
     cnt = gts.count("?")
 
+
     if not cnt:
-        return ecfeasbible(gt,st,episodes)
+        return ecfeasbible(gt,st,episodes)            
 
     for p in itertools.product(st.leaves(),repeat=cnt):
         cgt = gts

@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import argparse
 
 from metatreeop import count_wgd_nodes_combined
@@ -19,6 +21,9 @@ def main():
     parser.add_argument("--randomize_from", help="Start randomizing from a given size of binom(n,k) in the main loop", type=int, default=0)
     parser.add_argument("--noimprovement_stop", help="How many times to run DP with no improvement (0 - do not stop)", type=int, default=0)
     parser.add_argument("--reversed_climb", help="Start from fixedwgd and interatively search in larger sets untils solution is found", action='store_true')   
+    parser.add_argument("--distribution_maps", help="Add distributions maps", action='store_true')   
+    parser.add_argument("--reference_trees", help="A path to a reference gene trees", type=str, default=None)   
+    parser.add_argument("--distribution_maps_epi", help="Compute distributions using episode set from initial gene trees", action='store_true')   
     parser.add_argument("--verbose", help="0 - basic, 1 - print wgd nodes", type=int, default=0)
 
     args = parser.parse_args()
@@ -33,12 +38,18 @@ def main():
     setid=re.sub('[A-Za-z/-]','',args.gene_trees)
     setid=re.sub('^_*','',setid)
 
-    # print("!!!!",args.reversed_climb)
 
     initial_gene_tree = None
     if args.initial_gene_tree:
         with open(args.initial_gene_tree) as f:
             initial_gene_tree = f.read()
+
+    reference_trees = None
+    if args.reference_trees:
+        with open(args.reference_trees) as f:
+            reference_trees = [Tree(str2tree(g_str)) for g_str in f.read().split() ]
+
+
 
     cost, used_nodes, exactsolution, outstats = count_wgd_nodes_combined(
             species_tree, 
@@ -49,7 +60,11 @@ def main():
             randomize_from = args.randomize_from,
             setid = setid,        
             reversed_climb = args.reversed_climb,
-            initial_gene_tree = initial_gene_tree
+            initial_gene_tree = initial_gene_tree,
+            distribution_maps = args.distribution_maps,
+            reference_trees = reference_trees,
+            distribution_maps_epi = args.distribution_maps_epi,
+            outgroup="o"
             )
 
     endtime = time.process_time() - t

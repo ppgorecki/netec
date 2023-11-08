@@ -265,19 +265,20 @@ class Node:
             return self.label+s
         return "(" + ",".join(c.markrepr(marknodes) for c in self.c) + ")" + self.label + s
 
-    def attrrepr(self, attrlabel, ignorezeros=True):
+    def attrrepr(self, attrlabels: list, ignorezeros=True):
         """
         Returns str representation where leaf labels are replaced using Node to str map
         """  
         s=""          
-        if hasattr(self,attrlabel):
-            val = getattr(self,attrlabel)
-            if not (ignorezeros and not val):            
-                s=f" {attrlabel}={getattr(self,attrlabel)}"
-        
+        for attrlabel in attrlabels: 
+            if hasattr(self, attrlabel):
+                val = getattr(self, attrlabel)
+                if not (ignorezeros and not val):            
+                    s+=f" {attrlabel}={val}"
+
         if self.leaf():
             return self.label+s
-        return "(" + ",".join(c.attrrepr(attrlabel) for c in self.c) + ")" + self.label + s
+        return "(" + ",".join(c.attrrepr(attrlabels, ignorezeros) for c in self.c) + ")" + self.label + s
 
 
 
