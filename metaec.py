@@ -27,7 +27,9 @@ def main():
     parser.add_argument("--distribution_maps", help="Add distributions maps", action='store_true')   
     parser.add_argument("--reference_trees", help="A path to a reference gene trees", type=str, default=None)   
     parser.add_argument("--distribution_maps_epi", help="Compute distributions using episode set from initial gene trees", action='store_true')   
-    parser.add_argument("--verbose", help="0 - basic, 1 - print wgd nodes", type=int, default=0)
+    parser.add_argument("--print_distr_maps", help="Print the output tree with distribution maps", action='store_true')
+    parser.add_argument("--verbose", help="0 - none, 1 - basic, 2 - print wgd nodes", type=int, default=1)
+    parser.add_argument("--distr_counts", help="Do not normalize distr maps", action='store_true')
 
     args = parser.parse_args()
 
@@ -53,7 +55,6 @@ def main():
             reference_trees = [Tree(str2tree(g_str)) for g_str in f.read().split() ]
 
 
-
     cost, used_nodes, exactsolution, outstats = count_wgd_nodes_combined(
             species_tree, 
             gene_trees, 
@@ -67,7 +68,10 @@ def main():
             distribution_maps = args.distribution_maps,
             reference_trees = reference_trees,
             distribution_maps_epi = args.distribution_maps_epi,
-            outgroup="o"
+            print_distr_maps = args.print_distr_maps,
+            outgroup="o",
+            verbose=args.verbose,
+            distr_counts=args.distr_counts
             )
 
     endtime = time.process_time() - t
@@ -81,9 +85,10 @@ def main():
             f.write(f"noimprovement_stop={args.noimprovement_stop}\n")
             f.write(f"time={endtime}")
         
-    print(f"[{setid}] Cost: {cost} Exact:{exactsolution}")
+    if args.verbose:
+        print(f"[{setid}] Cost: {cost} Exact:{exactsolution}")
 
-    if args.verbose==1:
+    if args.verbose==2:
         print("Used nodes: ")
         for node in used_nodes:
             print(node)
