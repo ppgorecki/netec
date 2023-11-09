@@ -8,6 +8,7 @@ import math
 from os import getppid
 from random import sample, choice
 from copy import copy, deepcopy
+import statistics 
 
 Unknown = None
 
@@ -658,7 +659,7 @@ def count_wgd_nodes_combined(
         verbose = verbose,
         distr_counts=distr_counts)
 
-def gtwithdistrmaps(gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
+def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
 
     def traverse_outgroup(n):
         """
@@ -684,9 +685,18 @@ def gtwithdistrmaps(gt, dpdistr, reference_tree=None, outgroup: str = "outgroup"
                 s="d="+"{"+",".join(f"'{k}':{v:.4f}" for k, v in dpdistr[n].items())+"}"
                 s+=f" s={len(dpdistr[n])}"
                 sv = ",".join(f"{v:.4f}" for v in sorted(set(dpdistr[n].values())))
-                s+=f" valset=[{sv}]"
-                s+=f" distrsum={n.distrsum}"
+                s+=f" valset=[{sv}]"                                
                 s+=f" lenvalset={len(set(dpdistr[n].values()))}"
+                snode = st.root.findnode( frozenset(dpdistr[n].keys()))
+                mean_stdev = (statistics.mean(dpdistr[n].values()), statistics.stdev(dpdistr[n].values()))
+                if snode is not None:
+                    s += f" stdistr={snode.num}"                    
+                    snode.lfmapcnt+=1 # increase the count in s
+                    snode.lfmappoints.append(mean_stdev)
+                else:
+                    s+=f" stdistr=-1"
+                    st.root.lfmapcnt_none += 1 # increase the count in s
+                    st.root.lfmappoints_none.append(mean_stdev)
                 if n.refleaf is not None:
                     s+=" r="+n.refleaf.clusterleaf
                     refval = dpdistr[n].get(n.refleaf.clusterleaf,None)
@@ -711,18 +721,35 @@ def gtwithdistrmaps(gt, dpdistr, reference_tree=None, outgroup: str = "outgroup"
             l.refleaf = None
 
 
-    for k,d in dpdistr.items():
-        if not hasattr(k, 'distrsum'): # prevent double normalization
-            s = sum(d.values())
-            if not distr_counts:
-                for slab in d:
-                    d[slab] = d[slab]/s    
-    
-            k.distrsum=s
+    distrsum = None
+    if not hasattr(gt.root, 'distrsum'): # prevent double normalization        
+        for k,d in dpdistr.items():
+                s = sum(d.values())                
+                if not distr_counts:
+                    for slab in d:
+                        d[slab] = d[slab]/s
+
+                if distrsum is None:
+                    distrsum = s
+                else:
+                    assert s == distrsum            
+
+    gt.root.distrsum = distrsum # store in the root only
+
+    for sn in st.nodes:
+        sn.lfmapcnt = 0 
+        sn.lfmappoints = []
+    st.root.lfmapcnt_none = 0 
+    st.root.lfmappoints_none = []
 
     traverse_outgroup(gt.root)
 
-    return traverse(gt.root)
+    res = traverse(gt.root)
+
+    #print(st.root.attrrepr(["lfmapcnt","lfmappoints","lfmapcnt_none","lfmappoints_none"]))
+    #print(st.root.attrrepr(["lfmapcnt","lfmapcnt_none"]))
+
+    return res, distrsum
 
 def randcombinations(X,k):    
     while True:
@@ -759,7 +786,7 @@ def count_wgd_nodes(
     
     outgrouped = st.root.c[1].clusterleaf == outgroup
 
-    epiattr = ['episize','epigtcount','epibestwgd','num']
+    epiattr = ['episize', 'epigtcount', 'epibestwgd', 'num', 'lfmapcnt', 'lfmapcnt_none', 'distrsum']
 
     # root.c[0] - skip outgroup
     
@@ -837,6 +864,8 @@ def count_wgd_nodes(
     if not unklabs:
         exactsolution = True
 
+
+
     def reporterror(outfile, info, outstats):            
         f = open("metaec.err.log","a")
         f.write(f"\n========={outfile}============\n")
@@ -848,15 +877,21 @@ def count_wgd_nodes(
 
     def getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup):
 
+        if verbose:
+            print(f"[{setid}] Computing gene-species distribution maps")
+
         _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
 
         if dpdistr is None:
             reporterror(outfile, "No distribution map (dpdistr is None)", outstats)
 
-        stats="gtdistrmaps="+gtwithdistrmaps(gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts)+"\n"
+        tr, distrsum = gtwithdistrmaps(st, gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts)
+        stats="gtdistrmaps="+tr+"\n"
+
+        stats+=f"distrsum={distrsum}\n"
 
         if reference_tree:
-            stats+="leafmapinferrence="+gtwithdistrmaps(gt, dpdistr, reference_tree, outgroup=outgroup, distr_counts=distr_counts)+"\n"
+            stats+="leafmapinferrence="+gtwithdistrmaps(gt, dpdistr, reference_tree, outgroup=outgroup, distr_counts=distr_counts)[0]+"\n"
 
         return stats
 
@@ -864,7 +899,8 @@ def count_wgd_nodes(
         # calculate only distributions based on the episode set
         # outstats += getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
         dpcalls = 1
-        exactsolution = best_cost == len(fixed_wgd_nodes)
+
+        exactsolution = best_cost == len(fixed_wgd_nodes)        
        
     else:
 
@@ -1029,20 +1065,26 @@ def count_wgd_nodes(
 
         gt_inferred_str_wo = ";".join(str(t) for t in gt_wo )
 
+        if distribution_maps:        
+            outstats+=getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
+            
+
+        if print_distr_maps:            
+            _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
+            tr, distrsum = gtwithdistrmaps(st, gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts)
+            print(tr + f" distrsum={distrsum}")
+
         outstats+=f"outgenetrees_wo=\"{gt_inferred_str_wo}\"\n"
         outstats+=f"bestcost_worec={worec}\n"
         outstats+=f"bestcost_wo={best_cost-eccorrection}\n"
         outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr)}\"\n"
         outstats+=f"outspeciestree_worec=\"{st_wo.root.attrrepr(epiattr)}\"\n"
 
-        if print_distr_maps:            
-            _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
-            print(gtwithdistrmaps(gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts))
-
         if worec != best_cost-eccorrection:
             reporterror(outfile, "Inconsistency in EC cost computation {worec} {best_cost-eccorrection}.", outstats)
+    else:
+        if distribution_maps:        
+            outstats+=getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
 
-    if distribution_maps:
-        outstats+=getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)  
-        
+    
     return best_cost, best_wgd_nodes, exactsolution, outstats
