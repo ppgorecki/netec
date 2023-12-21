@@ -53,6 +53,14 @@ To get more detailed help execute:
 > metaec_multiset.sh
 ```
 
+### Simulated datasets preparation
+
+In `simulations` directory we provided scripts used to simulate gene trees. Requirements:
+* SimPhy 1.0
+* INDELible V1.03
+* urec 2.04  (https://bitbucket.org/pgor17/urec)
+* FastTree version 2.1.11 (single precision variant)
+
 ### Questions ###
 
 For questions contact:
