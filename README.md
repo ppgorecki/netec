@@ -35,7 +35,9 @@ To process simulated dataset:
 > metaec_multiset.sh -R50 -N100 -j6 -o sim_out -d data_sim data_sim/wgd-[1-5]-*_0*
 ```
 
-If the analysis is interrupted, running the command again will resume processing from where it left off.
+If the analysis is interrupted, running the command again will resume processing from where it left off. Note that the output files could be large (e.g., ~3GB).
+
+Please contact us if you want to obtain directly wgd.csv files.
 
 Here: 
 
@@ -50,6 +52,15 @@ To get more detailed help execute:
 ```
 > metaec_multiset.sh
 ```
+
+### Simulated datasets preparation
+
+In `simulations` directory we provided scripts used to simulate gene trees. Requirements:
+
+*	SimPhy 1.0
+*	INDELible V1.03
+*	urec 2.04  (https://bitbucket.org/pgor17/urec)
+*	FastTree version 2.1.11 (single precision variant)
 
 ### Questions ###
 
