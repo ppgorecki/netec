@@ -688,15 +688,27 @@ def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgr
                 s+=f" valset=[{sv}]"                                
                 s+=f" lenvalset={len(set(dpdistr[n].values()))}"
                 snode = st.root.findnode( frozenset(dpdistr[n].keys()))
-                mean_stdev = (statistics.mean(dpdistr[n].values()), statistics.stdev(dpdistr[n].values()))
+                mean = statistics.mean(dpdistr[n].values())
+
+                if len(dpdistr[n])>1:
+                    pstdev = statistics.pstdev(dpdistr[n].values()) # population stdev
+                else: 
+                    pstdev = 0
+
+                cv = pstdev/mean # coefficient of variation
+
                 if snode is not None:
                     s += f" stdistr={snode.num}"                    
                     snode.lfmapcnt+=1 # increase the count in s
-                    snode.lfmappoints.append(mean_stdev)
+                    snode.lfmapmean.append(mean)
+                    snode.lfmappstdev.append(pstdev)
+                    snode.lfmapcv.append(cv)
                 else:
                     s+=f" stdistr=-1"
-                    st.root.lfmapcnt_none += 1 # increase the count in s
-                    st.root.lfmappoints_none.append(mean_stdev)
+                    st.root.trueroot.lfmapcnt_none += 1 # increase the count in s                    
+                    st.root.trueroot.lfmapmean_none.append(mean)
+                    st.root.trueroot.lfmappstdev_none.append(pstdev)
+                    st.root.trueroot.lfmapcv_none.append(cv)
                 if n.refleaf is not None:
                     s+=" r="+n.refleaf.clusterleaf
                     refval = dpdistr[n].get(n.refleaf.clusterleaf,None)
@@ -738,18 +750,19 @@ def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgr
 
     for sn in st.nodes:
         sn.lfmapcnt = 0 
-        sn.lfmappoints = []
-    st.root.lfmapcnt_none = 0 
-    st.root.lfmappoints_none = []
-
+        sn.lfmapmean = []
+        sn.lfmappstdev = []
+        sn.lfmapcv = []
+    st.root.trueroot.lfmapcnt_none = 0 
+    st.root.trueroot.lfmapmean_none = [] 
+    st.root.trueroot.lfmappstdev_none = [] 
+    st.root.trueroot.lfmapcv_none = []
+    
     traverse_outgroup(gt.root)
 
-    res = traverse(gt.root)
+    res = traverse(gt.root)    
 
-    #print(st.root.attrrepr(["lfmapcnt","lfmappoints","lfmapcnt_none","lfmappoints_none"]))
-    #print(st.root.attrrepr(["lfmapcnt","lfmapcnt_none"]))
-
-    return res, distrsum
+    return res, distrsum 
 
 def randcombinations(X,k):    
     while True:
@@ -786,7 +799,7 @@ def count_wgd_nodes(
     
     outgrouped = st.root.c[1].clusterleaf == outgroup
 
-    epiattr = ['episize', 'epigtcount', 'epibestwgd', 'num', 'lfmapcnt', 'lfmapcnt_none', 'distrsum']
+    epiattr = ['episize', 'epigtcount', 'epibestwgd', 'num', 'lfmapcnt', 'lfmapcnt_none', 'lfmapcv', 'lfmapcv_none','distrsum' ] 
 
     # root.c[0] - skip outgroup
     
@@ -847,6 +860,8 @@ def count_wgd_nodes(
         stroot = st.root
         gts_split = [gt]
         eccorrection = 0
+
+    st.root.trueroot=stroot # needed in distr counting
         
 
     climbs=""
