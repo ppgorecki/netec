@@ -29,10 +29,10 @@ To process yeast dataset:
 > metaec_multiset.sh -R50 -N50 -j10 -o yeast_out -d data_yeast data_yeast/gtrees_0.[0-6]*
 ```
 
-To process simulated dataset:
+To process simulated dataset (6 wgd scenarios x {0.0 .. 0.6} x 100):
 
 ```
-> metaec_multiset.sh -R50 -N100 -j6 -o sim_out -d data_sim data_sim/wgd-[1-5]-*_0*
+> metaec_multiset.sh -R50 -N100 -j6 -o sim_out -d data_sim_inferred_final data_sim_inferred_final/wgd-[0-5]-*_0.[0-6]*
 ```
 
 If the analysis is interrupted, running the command again will resume processing from where it left off. Note that the output files could be large (e.g., ~3GB).
@@ -55,7 +55,9 @@ To get more detailed help execute:
 
 ### Simulated datasets preparation
 
-In `simulations` directory we provided scripts used to simulate gene trees. Requirements:
+In `simulations` directory we provided scripts used to simulate gene trees. 
+
+Requirements:
 
 *	SimPhy 1.0
 *	INDELible V1.03
