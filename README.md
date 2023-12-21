@@ -35,7 +35,9 @@ To process simulated dataset:
 > metaec_multiset.sh -R50 -N100 -j6 -o sim_out -d data_sim data_sim/wgd-[1-5]-*_0*
 ```
 
-If the analysis is interrupted, running the command again will resume processing from where it left off.
+If the analysis is interrupted, running the command again will resume processing from where it left off. Note that the output files could be large (e.g., ~3GB).
+
+Please contact us if you want to obtain directly wgd.csv files.
 
 Here: 
 
