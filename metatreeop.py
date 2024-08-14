@@ -1,9 +1,10 @@
 import itertools
 from typing import Set, Tuple, List
-from rec import rec
+from rec import rec, recnet
 from fixedec import fixedec
 from optTrees_gdscore import opttrees_gdscore
 from treeop import Tree, Node, str2tree
+from netop import Network
 import math
 from os import getppid
 from random import sample, choice
@@ -216,7 +217,11 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
         """
         if (s, g) in sigmav:
             return sigmav[s, g], sigma_usage[s, g], sigma_leafmap[s, g]
-        elif s.leaf() and g.leaf():
+
+        if s.reticulation:
+            return sigma(s.c[0], g)
+
+        if s.leaf() and g.leaf():
             is_reconciled, usage, leafmap = g.label == s.label or g.label[0] == "?", set(), tuple()
             if g.label[0] == "?":
                 if s.label == excludedoutgroup:
@@ -226,7 +231,7 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
                     
 
         elif not s.leaf() and not g.leaf():
-            is_reconciled, usage, leafmap = False, set(), tuple()
+            is_reconciled, usage, leafmap = False, set(), tuple()            
             for left, right in ((s.c[0], s.c[1]), (s.c[1], s.c[0])):
                 is_reconciled_left, usage_left, leafmap_left = delta_down(left, g.c[0])
 
@@ -311,12 +316,12 @@ def sumcounts(*dicts):
     return None
 
 
-def is_reconciled_using_wgd_withcounts(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> [bool, dict]:
+def is_reconciled_using_wgd_withcounts(net: Network, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> [bool, dict]:
     """
     Checks whether S and G can be reconciled using WGD events from a given set nodes of S with g->s map counts
 
     Args:   
-        st: Tree - a species tree
+        net: Network - a network
         gt: Tree - a gene tree with "?" nodes
         wgd_nodes: Set[Node] - allowed duplication epidodes
         wgddebug: Bool - if True print additional debug info
@@ -562,15 +567,19 @@ def is_reconciled_using_wgd_withcounts(st: Tree, gt: Tree, wgd_nodes: Set[Node],
         return is_valid, deltadown_countsT[st.root, gt.root]
     return False,None
 
-
-def split_outgrouped_tree(tree: Tree, outgroup: str = "outgroup") -> List[Tree]:    
+"""
+Decompose merged gene trees
+"""
+def split_outgrouped_tree(gtree: Tree, outgroup: str = "outgroup") -> List[Tree]:    
     res = []
-    for i in tree.nodes:        
+    for i in gtree.nodes:        
         if i.leaf() and i.clusterleaf == outgroup:
             res.append(Tree(str2tree(str(i.parent.c[0]))))
     return res
 
-
+"""
+Merged gene trees in a single tree
+"""
 def combine_gene_trees(gtrees: List[Tree], outgroup: str = "outgroup") -> Tree:
     """ Adds an outgroup species to all input gene trees and merges them into one tree,
     eg. (a, b) and (b, c) -> (((a, b), outgroup), ((b, c), outgroup))
@@ -592,10 +601,15 @@ def combine_gene_trees(gtrees: List[Tree], outgroup: str = "outgroup") -> Tree:
     return Tree(str2tree(gtrees[0]))
 
 
-def add_outgroup(stree: Tree, outgroup: str) -> Tree:
-    return Tree(str2tree(f"({str(stree)},{outgroup})"))
+"""
+Add outgroup to a tree or a network
+"""
+def add_outgroup(network: Network, outgroup: str) -> Tree:    
+    return network.__class__(str2tree(f"({str(network)},{outgroup})"))
 
-
+"""
+Fill missing leaves using random labels
+"""
 def random_labelling(gtree: Tree, stree: Tree, outgroup: str) -> str:
     streeleaves = [ l for l in stree.leaves() if l.clusterleaf!=outgroup ]
     def _m(g: Node):
@@ -608,7 +622,7 @@ def random_labelling(gtree: Tree, stree: Tree, outgroup: str) -> str:
     return _m(gtree.root)
 
 def count_wgd_nodes_combined(
-        stree: Tree, 
+        network: Network, 
         gtrees: List[Tree], 
         outgroup: str = "outgroup", 
         wgddebug = False, 
@@ -628,23 +642,21 @@ def count_wgd_nodes_combined(
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
      in order to reconcile S and a set of gene trees with ?
-    
     """
-    
 
     for g in gtrees:
         if not g.is_binary():
             raise ValueError(f"Found a non-binary gene tree {g}")
 
     gtree = combine_gene_trees(gtrees, outgroup)
-    stree = add_outgroup(stree, outgroup)
+    network = add_outgroup(network, outgroup)
 
     if reference_trees:
         reference_tree = combine_gene_trees(reference_trees)
     else:
         reference_tree = None
 
-    return count_wgd_nodes(stree, gtree,  outgroup, 
+    return count_wgd_nodes(network, gtree,  outgroup, 
         wgddebug=wgddebug, 
         outfile=outfile,
         noimprovement_stop=noimprovement_stop, 
@@ -769,7 +781,7 @@ def randcombinations(X,k):
         yield sample(X, k)
 
 def count_wgd_nodes(
-        st: Tree, 
+        st: Network, 
         gt: Tree, 
         outgroup: str = 'outgroup', 
         wgddebug=False, 
@@ -799,11 +811,17 @@ def count_wgd_nodes(
     
     outgrouped = st.root.c[1].clusterleaf == outgroup
 
+    speciestreeonly = not st.reticulations
+
+    # ugly, for reporting only
+    if st.__class__ == Network:
+        speciestreelab = "network" 
+    else:
+        speciestreelab = "speciestree"
+
     epiattr = ['episize', 'epigtcount', 'epibestwgd', 'num', 'lfmapcnt', 'lfmapcnt_none', 'lfmapcv', 'lfmapcv_none','distrsum' ] 
 
-    # root.c[0] - skip outgroup
-    
-
+    # root.c[0] - skip outgroup    
     if initial_gene_tree:
         # initialize using initial gene tree
         gt_inferred_str = initial_gene_tree
@@ -811,8 +829,9 @@ def count_wgd_nodes(
         # initialize upper bound using random gene tree
         gt_inferred_str = random_labelling(gt, st, outgroup)        
 
-    best_cost, best_wgd_nodes = rec([Tree(str2tree(gt_inferred_str))], st)
-
+    # Compute some initial cost             
+    best_cost, best_wgd_nodes = recnet([Tree(str2tree(gt_inferred_str))], st)
+        
     if outfile:
         with open(outfile+".genetree","w") as f:
             f.write(gt_inferred_str)
@@ -820,7 +839,11 @@ def count_wgd_nodes(
     outstats = f"initialgenetree={initial_gene_tree}\n"
     outstats+= f"initialgenetreecost={best_cost}\n"
 
-    fixed_wgd_nodes = fixedec(gt, st)
+    if speciestreeonly:
+        fixed_wgd_nodes = fixedec(gt, st)
+    else:
+        # TODO, fixedec for networks
+        fixed_wgd_nodes = set()
 
     maxec = len(st.root.nodes()) 
     potential_wgd_nodes = list(set(st.root.nodes()) - fixed_wgd_nodes)
@@ -838,8 +861,8 @@ def count_wgd_nodes(
 
     outstats+=f"setid=\"{setid}\"\n"
     outstats+=f"genetree=\"{gt}\"\n"
-    outstats+=f"speciestree=\"{st}\"\n"
-    outstats+=f"speciestreefixedwgd=\"{st.root.markrepr(fixed_wgd_nodes)}\"\n"
+    outstats+=f"{speciestreelab}=\"{st}\"\n"
+    outstats+=f"{speciestreelab}fixedwgd=\"{st.root.markrepr(fixed_wgd_nodes)}\"\n"
     outstats+=f"fixedwgd={len(fixed_wgd_nodes)}\n"
     outstats+=f"reversed_climb={reversed_climb}\n"
     outstats+=f"unknownlabels={unklabs}\n"
@@ -847,12 +870,12 @@ def count_wgd_nodes(
     if outgrouped:        
         gts_split = split_outgrouped_tree(gt, outgroup)
         stroot = strootnooutgroup = st.root.c[0]
-        eccorrection = 1 if len(gts_split)>1 else 0 # additional dupliaction of two trees are present
+        eccorrection = 1 if len(gts_split)>1 else 0 # additional dupliaction if two trees are present
 
         outstats+=f"#with no outgroup (wo)\n"
         outstats+=f"genetrees_wo=\"{';'.join(str(g) for g in gts_split)}\"\n"
-        outstats+=f"speciestree_wo=\"{stroot}\"\n"
-        outstats+=f"speciestreefixedwgd_wo=\"{stroot.markrepr(fixed_wgd_nodes)}\"\n"
+        outstats+=f"{speciestreelab}_wo=\"{stroot}\"\n"
+        outstats+=f"{speciestreelab}fixedwgd_wo=\"{stroot.markrepr(fixed_wgd_nodes)}\"\n"
         outstats+=f"fixedwgd_wo={len(fixed_wgd_nodes)-eccorrection}\n"
         outstats+=f"#end (wo)\n"
 
@@ -861,7 +884,7 @@ def count_wgd_nodes(
         gts_split = [gt]
         eccorrection = 0
 
-    st.root.trueroot=stroot # needed in distr counting
+        st.root.trueroot = stroot # needed in distr counting
         
 
     climbs=""
@@ -954,54 +977,38 @@ def count_wgd_nodes(
             cnt = 0
             for wgd_nodes in wgd_node_sets:                        
 
+                # Test combination                
 
-                # if (len(wgd_nodes)==2):
-                #     wgd_nodes = [ v for v in st.nodes if v.num in (5,1)]
+                wgd_node_set = set(wgd_nodes) | fixed_wgd_nodes                       
+                is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)   
 
-                wgd_node_set = set(wgd_nodes) | fixed_wgd_nodes
-                # print ("!!WN", [v.num for v in wgd_nodes])
-                # print ("!!WS", [v.num for v in wgd_node_set])
-                # print ("!!FI", [v.num for v in fixed_wgd_nodes])
-                
-
-                is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)                                
                 cnt+=1
                 dpcalls+=1
                 dpfromlastimprovement+=1                
         
                 if is_feasible:
                     gt_inferred_str = gt_inferred_str_cur                    
-                    gt_inferred = Tree(str2tree(gt_inferred_str))                    
-                    
-                    ec, used_ec_nodes = rec({gt_inferred}, st)
+                    gt_inferred = Tree(str2tree(gt_inferred_str))
 
                     if verbose:
-                        print(f"[{setid}] Feasible solution ec={ec} lenec={len(used_ec_nodes)} wgd={len(used_wgd_nodes)} bc={best_cost}")
+                        print(f"[{setid}] Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec}")
 
-                    if ec>len(used_wgd_nodes):
-                        raise Exception("Incorrect EC>DP cost")
-
-                    # if len(used_wgd_nodes)<ec:
-                    #     print (f"[{setid}]","fx",sorted(v.num for v in fixed_wgd_nodes))
-                    #     print (f"[{setid}]","wgd",sorted(v.num for v in wgd_nodes))
-                    #     print (f"[{setid}]","uec",sorted(v.num for v in used_ec_nodes))
-                    #     print (f"[{setid}]","uwg",sorted(v.num for v in used_wgd_nodes))
-                    #     print(f"[{setid}]",gt)
-
-                    #     print(f"[{setid}]",st.root.attrrepr(epiattr))
-                    #     print(f"[{setid}]",gt_inferred)
+                    if speciestreeonly:                                        
+                        ec, used_ec_nodes = rec({gt_inferred}, st)
                         
-                    #     print(f"[{setid}] Warning!!!!!!!!!!!!!!!!")
-                    
-                    #if ec < len(used_wgd_nodes):
-                    best_cost, best_wgd_nodes = ec, used_ec_nodes
-                    #else:
-                    #    best_cost, best_wgd_nodes = len(used_wgd_nodes), used_wgd_nodes                                
-                    dpfromlastimprovement = 0
+                        if ec>len(used_wgd_nodes):
+                            raise Exception(f"Incorrect EC>DP cost {ec}>{used_wgd_nodes}")
 
-                    if verbose:
-                        print(f"[{setid}] Feasible solution with new best_cost:{best_cost}/{maxec}")
+                        if ec<len(used_wgd_nodes):
+                            print(f"[{setid}] Found EC solution with ec={len(ec)}/{maxec}")                            
+                        # Update from EC algorithm                        
+                        best_cost, best_wgd_nodes = ec, used_ec_nodes
 
+                    else:
+                        # Network case, accept feasible                       
+                        best_cost, best_wgd_nodes = len(used_wgd_nodes), used_wgd_nodes
+                                        
+                    dpfromlastimprovement = 0            
 
                     if reversed_climb:
                         # solution found
@@ -1012,7 +1019,7 @@ def count_wgd_nodes(
                         with open(outfile+".genetree","w") as f:
                             f.write(gt_inferred_str)                    
             
-                    break            
+                    break # the loop           
                 
                 if noimprovement_stop and dpfromlastimprovement>=noimprovement_stop:                    
                     exactsolution = False # unknown
@@ -1045,10 +1052,9 @@ def count_wgd_nodes(
         outstats+=f"samplingsets={samplingsets}\n"
         outstats+=f"outgenetree=\"{gt_inferred_str}\"\n"
         
-    
-    
+
     for n in best_wgd_nodes:
-        n.epibestwgd=1
+        n.epibestwgd = 1
     
     outstats+=f"bestcost={best_cost}\n"
     outstats+=f"dpcalls={dpcalls}\n"
@@ -1058,48 +1064,54 @@ def count_wgd_nodes(
 
     if outgrouped:
 
-        # recompute ec to get epicounts for wo
+        gt_wo = split_outgrouped_tree(Tree(str2tree(gt_inferred_str)), outgroup)        
+        st_wo = Network(str2tree(stroot.netrepr()))
 
-        gt_wo = split_outgrouped_tree(Tree(str2tree(gt_inferred_str)), outgroup)
+        if speciestreeonly:
 
-        st_wo = Tree(str2tree(str(stroot)))
-        worec, _ = rec(gt_wo, st_wo)
+            # recompute ec to get epicounts for wo
+            # only for trees
+            worec, ecn = rec(gt_wo, st_wo)
 
-        # check correctness
-        for stn, st_won in zip(stroot.nodes(), st_wo.root.nodes()):
-            a='episize'
-            if hasattr(stn, a) and hasattr(st_won, a):
-                if getattr(stn,a)!=getattr(st_won, a):
-                    raise Exception(f"Incorrect EC attribute {a} {getattr(stn,a)} {getattr(st_won,a)}")
-                continue
+            # check correctness
+            a = 'episize'
+            for stn, st_won in zip(stroot.nodes(), st_wo.root.nodes()):
+                if hasattr(stn, a) and hasattr(st_won, a):
+                    if getattr(stn,a)!=getattr(st_won, a):
+                        raise Exception(f"Incorrect EC attribute {a} {getattr(stn,a)} {getattr(st_won,a)}")
+                    continue
 
-            if not hasattr(stn,a) and not hasattr(st_won, a):
-                continue
-            else: 
-                raise Exception(f"Only one EC attribute present {a} {hasattr(stn,a)} {hasattr(st_won,a)} in {stn.attrrepr(epiattr)} {st_won.attrrepr(epiattr)}")
+                if not hasattr(stn, a) and not hasattr(st_won, a):
+                    continue            
+                
+                if hasattr(st_won, a) and not st_won.episize: continue
+
+                raise Exception(f"Only one EC attribute present {a} {hasattr(stn,a)} {hasattr(st_won, a)} in {stn.attrrepr(epiattr)} {st_won.attrrepr(epiattr)}")
+
+            outstats+=f"bestcost_worec={worec}\n"
+            if worec != best_cost-eccorrection:
+                reporterror(outfile, "Inconsistency in EC cost computation {worec} {best_cost-eccorrection}.", outstats)
 
         gt_inferred_str_wo = ";".join(str(t) for t in gt_wo )
 
-        if distribution_maps:        
-            outstats+=getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
+        if distribution_maps:   
+            # TODO: networks     
+            outstats += getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
             
-
         if print_distr_maps:            
+            # TODO: networks
             _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
             tr, distrsum = gtwithdistrmaps(st, gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts)
             print(tr + f" distrsum={distrsum}")
 
-        outstats+=f"outgenetrees_wo=\"{gt_inferred_str_wo}\"\n"
-        outstats+=f"bestcost_worec={worec}\n"
+        outstats+=f"outgenetrees_wo=\"{gt_inferred_str_wo}\"\n"        
         outstats+=f"bestcost_wo={best_cost-eccorrection}\n"
         outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr)}\"\n"
         outstats+=f"outspeciestree_worec=\"{st_wo.root.attrrepr(epiattr)}\"\n"
 
-        if worec != best_cost-eccorrection:
-            reporterror(outfile, "Inconsistency in EC cost computation {worec} {best_cost-eccorrection}.", outstats)
+
     else:
         if distribution_maps:        
             outstats+=getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
-
     
     return best_cost, best_wgd_nodes, exactsolution, outstats

@@ -280,6 +280,16 @@ class Node:
             return self.label+s
         return "(" + ",".join(c.attrrepr(attrlabels, ignorezeros) for c in self.c) + ")" + self.label + s
 
+    def extractattrfromcomment(self, label):
+        for l in self.comments:
+            for a in l.split(":"):
+                try:           
+                    x, y = a.split('=')
+                    if x == label:
+                        return y
+                except:
+                    continue
+        return 0
 
 
 

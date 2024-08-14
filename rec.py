@@ -1,6 +1,7 @@
 import itertools
 import math
 from treeop import Tree, str2tree
+from netop import Network
 from leafdistr import emptyleafcounts, leafcountsupdate
 
 # return left child
@@ -55,9 +56,11 @@ def init(gtrees, st):
             g.gtid = i
             
 
-# input : set of gene trees (gtrees), species tree (st)
-# output : minimal EC score, list of nodes with episodes for that score
-def rec(gtrees, st):
+""" 
+input : set of gene trees (gtrees), species tree (st)
+output : minimal EC score, list of nodes with episodes for that score
+"""
+def rec(gtrees, st):    
     init(gtrees, st)
     dup = []  # duplication nodes == nodes with defined interval
     stnodespostorder = st.root.get_nodes()
@@ -113,6 +116,27 @@ def rec(gtrees, st):
             ep_nodes.append(s)
 
     return ec_score, ep_nodes
+
+"""
+Just approximation of EC(Gtrees, Network) with the first display tree
+If network is a tree, the cost is exact
+"""
+def recnet(gtrees, st: Network):  
+    # For networks take the first display tree and extract episode nodes        
+    stdispl = Tree(str2tree(st.displayedtreebyid(0, addnoderef=True)))
+
+    # Reconstruct nodes from the network using ref 
+    ec_score, wgd_nodes = rec(gtrees, stdispl)
+    
+    # Take wgd_nodes from the original network (not the display tree)
+    st_wgd_nodes = [] 
+    for k in wgd_nodes:
+        stnode = st.nodes[int(k.extractattrfromcomment('ref'))]
+        stnode.episize = k.episize
+        st_wgd_nodes.append(stnode)
+
+    return ec_score, st_wgd_nodes
+
 
 
 def ecfeasbible(gt, st, episodes) -> bool:
