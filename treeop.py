@@ -155,18 +155,17 @@ class Node:
             return self.label
         return "(" + ",".join(str(c) for c in self.c) + ")" + self.label
 
-    def netrepr(self):
+    def netrepr(self, par=None):
         if self.leaf():
             return self.clusterleaf
+
         s = ''
         if self.reticulation:
-            s = '#' + self.retid
-            # Make sure child of reticulation vertex is processed once
-            if hasattr(self, 'visited'):
-                del self.visited
-                return s
-            self.visited = True
-        return '(' + ",".join(c.netrepr() for c in self.c) + ')' + s
+            s = '#' + self.retid                                            
+            if self.rghparent == par:
+                return s 
+
+        return '(' + ",".join(c.netrepr(self) for c in self.c) + ')' + s
 
     def __repr__(self):
         return str(self)
@@ -253,32 +252,66 @@ class Node:
             return self.label
         return "(" + ",".join(c.nodemaprepr(nodemap) for c in self.c) + ")" + self.label
 
+    # OLD
+    # def markrepr(self, marknodes):
+    #     """
+    #     Returns str representation where leaf labels are replaced using Node to str map
+    #     """  
+    #     s=""          
+    #     if self in marknodes:
+    #         s=" mark=1"
+        
+    #     if self.leaf():
+    #         return self.label+s
+    #     return "(" + ",".join(c.markrepr(marknodes) for c in self.c) + ")" + self.label + s
+
+
     def markrepr(self, marknodes):
-        """
-        Returns str representation where leaf labels are replaced using Node to str map
-        """  
         s=""          
         if self in marknodes:
             s=" mark=1"
-        
-        if self.leaf():
-            return self.label+s
-        return "(" + ",".join(c.markrepr(marknodes) for c in self.c) + ")" + self.label + s
 
-    def attrrepr(self, attrlabels: list, ignorezeros=True):
+        if self.leaf():
+            return self.clusterleaf + s
+
+        s = ''
+        if self.reticulation:
+            s = '#' + self.retid
+            # Make sure child of reticulation vertex is processed once
+            if hasattr(self, 'visited'):
+                del self.visited
+                return s
+            self.visited = True
+        return "(" + ",".join(c.markrepr(marknodes) for c in self.c) + ")" + self.label + s
+        
+
+    def attrrepr(self, attrlabels: list, par=None, ignorezeros=True, gsestyle=False):
         """
         Returns str representation where leaf labels are replaced using Node to str map
         """  
-        s=""          
+        s=[]          
         for attrlabel in attrlabels: 
             if hasattr(self, attrlabel):
                 val = getattr(self, attrlabel)
-                if not (ignorezeros and not val):            
-                    s+=f" {attrlabel}={val}"
+                if not (ignorezeros and not val):                                
+                    s.append(f"{attrlabel}={val}")                    
+
+        if gsestyle: 
+            s = " ".join(s)
+            if s: s = " "+s
+        else: 
+            s  = '['+";".join(s)+']'  # newick
 
         if self.leaf():
-            return self.label+s
-        return "(" + ",".join(c.attrrepr(attrlabels, ignorezeros) for c in self.c) + ")" + self.label + s
+            return self.clusterleaf + s
+        
+        r = ''
+        if self.reticulation:
+            r = '#' + self.retid
+            if self.rghparent == par:            
+                return r
+
+        return "(" + ",".join(c.attrrepr(attrlabels, self, ignorezeros, gsestyle) for c in self.c) + ")" + r + s
 
     def extractattrfromcomment(self, label):
         for l in self.comments:

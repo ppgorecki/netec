@@ -30,8 +30,10 @@ def main():
     parser.add_argument("--reference_trees", help="A path to a reference gene trees", type=str, default=None)   
     parser.add_argument("--distribution_maps_epi", help="Compute distributions using episode set from initial gene trees", action='store_true')   
     parser.add_argument("--print_distr_maps", help="Print the output tree with distribution maps", action='store_true')
+    parser.add_argument("--episummaryfile", help="Save the species/network with the episize attributes", type=str, default='')
     parser.add_argument("--verbose", help="0 - none, 1 - basic, 2 - print wgd nodes", type=int, default=1)
     parser.add_argument("--distr_counts", help="Do not normalize distr maps", action='store_true')
+    parser.add_argument("--gsestyle", help="Use gse output for attributes; default is newick", action='store_true')
 
     args = parser.parse_args()
 
@@ -79,7 +81,8 @@ def main():
             print_distr_maps = args.print_distr_maps,
             outgroup="o",
             verbose=args.verbose,
-            distr_counts=args.distr_counts
+            distr_counts=args.distr_counts,
+            gsestyle=args.gsestyle
             )
 
     endtime = time.process_time() - t
@@ -92,6 +95,13 @@ def main():
             f.write(f"randomize_from={args.randomize_from}\n")
             f.write(f"noimprovement_stop={args.noimprovement_stop}\n")
             f.write(f"time={endtime}")
+
+    # Write output network (gse)
+    if args.episummaryfile:
+        pos = outstats.find('outspeciestree_wo')
+        if pos>=0:            
+            with open(args.episummaryfile,"w") as f:
+                f.write(outstats[pos:].split('\n')[0][19:-1])
         
     if args.verbose:
         print(f"[{setid}] Cost: {cost} Exact:{exactsolution}")
@@ -106,4 +116,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

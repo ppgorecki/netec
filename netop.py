@@ -52,11 +52,15 @@ class Network(Tree):
             i = din[retid]
             lpar = l.parent
             ipar = i.parent
-            lpar.c.remove(l)
-            ipar.c.remove(i)
 
-            lpar.c.insert(0, i)  # inserted at 0
-            ipar.c.insert(0, i)  # inserted at 0
+            i.lparpos = lpar.c.index(l) 
+            # lpar.c.remove(l)
+            #i.iparpos = ipar.c.index(i) 
+            # ipar.c.remove(i)
+
+            lpar.c[i.lparpos] = i  # inserted at i
+            #lpar.c.insert(0, i)  # inserted at 0
+            #ipar.c.insert(0, i)  # inserted at 0
 
             i.lftparent = ipar
             i.rghparent = lpar

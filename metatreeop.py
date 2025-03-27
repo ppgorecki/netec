@@ -607,6 +607,7 @@ Add outgroup to a tree or a network
 def add_outgroup(network: Network, outgroup: str) -> Tree:    
     return network.__class__(str2tree(f"({str(network)},{outgroup})"))
 
+
 """
 Fill missing leaves using random labels
 """
@@ -637,7 +638,8 @@ def count_wgd_nodes_combined(
         distribution_maps_epi = False,
         print_distr_maps = False,
         verbose = 1,
-        distr_counts = False
+        distr_counts = False,
+        gsestyle = False
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -669,7 +671,8 @@ def count_wgd_nodes_combined(
         distribution_maps_epi = distribution_maps_epi,
         print_distr_maps = print_distr_maps,
         verbose = verbose,
-        distr_counts=distr_counts)
+        distr_counts=distr_counts,
+        gsestyle = gsestyle)
 
 def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
 
@@ -796,7 +799,8 @@ def count_wgd_nodes(
         distribution_maps_epi = False,   # tree for distribution validation; must have the same topology as gt
         print_distr_maps = False,        
         verbose = 1,
-        distr_counts = False
+        distr_counts = False,
+        gsestyle = False
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -1058,7 +1062,7 @@ def count_wgd_nodes(
     
     outstats+=f"bestcost={best_cost}\n"
     outstats+=f"dpcalls={dpcalls}\n"
-    outstats+=f"outspeciestree=\"{st.root.attrrepr(epiattr)}\"\n"
+    outstats+=f"outspeciestree=\"{st.root.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
     outstats+=f"exactsolution={exactsolution}\n"
     outstats+=f"unknownlabels={unklabs}\n"
 
@@ -1086,7 +1090,7 @@ def count_wgd_nodes(
                 
                 if hasattr(st_won, a) and not st_won.episize: continue
 
-                raise Exception(f"Only one EC attribute present {a} {hasattr(stn,a)} {hasattr(st_won, a)} in {stn.attrrepr(epiattr)} {st_won.attrrepr(epiattr)}")
+                raise Exception(f"Only one EC attribute present {a} {hasattr(stn,a)} {hasattr(st_won, a)} in {stn.attrrepr(epiattr,gsestyle=gsestyle)} {st_won.attrrepr(epiattr,gsestyle=gsestyle)}")
 
             outstats+=f"bestcost_worec={worec}\n"
             if worec != best_cost-eccorrection:
@@ -1106,8 +1110,8 @@ def count_wgd_nodes(
 
         outstats+=f"outgenetrees_wo=\"{gt_inferred_str_wo}\"\n"        
         outstats+=f"bestcost_wo={best_cost-eccorrection}\n"
-        outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr)}\"\n"
-        outstats+=f"outspeciestree_worec=\"{st_wo.root.attrrepr(epiattr)}\"\n"
+        outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
+        outstats+=f"outspeciestree_worec=\"{st_wo.root.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
 
 
     else:
