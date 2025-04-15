@@ -9,7 +9,7 @@ from treeop import Tree, Node, str2tree, getlabs, randtreestr, compcostsmp
 import queue
 
 class Network(Tree):
-    def __init__(self, tup):
+    def __init__(self, tup, outgroup=None):
         Tree.__init__(self, tup)
 
         # recognize reticulations
@@ -74,6 +74,8 @@ class Network(Tree):
 
             self.reticulations.append(i)
             self.nodes.remove(l)
+
+        self.setnodes(outgroup=outgroup)
 
         for n in self.nodes:
             n._setcluster()  # reconstruct clusters
@@ -393,6 +395,11 @@ class Network(Tree):
     def sortedrepr(self):
         d = {(n, None) for n in self.nodes}
         self.root._setsortedrepr(d)
+
+    def subnettrees(self):
+        # return all max subtrees of the network
+        for sb in self.root.subnettrees(): 
+            yield sb
 
 
 # input: list of directed edges, must be non-empty

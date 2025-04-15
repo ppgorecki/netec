@@ -1,10 +1,10 @@
 
 # Tester for network based metaec
 
-RETICULATIONS=3
+RETICULATIONS=2
 N=5
 DESTDIR=metaecnettest
-GTREES=3
+GTREES=5
 
 mkdir -p $DESTDIR
 src/embnet.py -n rand:$N:$RETICULATIONS -pn > $DESTDIR/net.txt

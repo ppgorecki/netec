@@ -60,7 +60,7 @@ def init(gtrees, st):
 input : set of gene trees (gtrees), species tree (st)
 output : minimal EC score, list of nodes with episodes for that score
 """
-def rec(gtrees, st):    
+def reconcileEC(gtrees, st):    
     init(gtrees, st)
     dup = []  # duplication nodes == nodes with defined interval
     stnodespostorder = st.root.get_nodes()
@@ -121,12 +121,12 @@ def rec(gtrees, st):
 Just approximation of EC(Gtrees, Network) with the first display tree
 If network is a tree, the cost is exact
 """
-def recnet(gtrees, st: Network):  
+def reconcileNetECapprox(gtrees, st: Network):  
     # For networks take the first display tree and extract episode nodes        
     stdispl = Tree(str2tree(st.displayedtreebyid(0, addnoderef=True)))
 
     # Reconstruct nodes from the network using ref 
-    ec_score, wgd_nodes = rec(gtrees, stdispl)
+    ec_score, wgd_nodes = reconcileEC(gtrees, stdispl)
     
     # Take wgd_nodes from the original network (not the display tree)
     st_wgd_nodes = [] 

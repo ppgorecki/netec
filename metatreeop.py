@@ -1,7 +1,7 @@
 import itertools
 from typing import Set, Tuple, List
-from rec import rec, recnet
-from fixedec import fixedec
+from rec import reconcileEC, reconcileNetECapprox
+from fixedec import fixedec, fixedecnet
 from optTrees_gdscore import opttrees_gdscore
 from treeop import Tree, Node, str2tree
 from netop import Network
@@ -12,6 +12,9 @@ from copy import copy, deepcopy
 import statistics 
 
 Unknown = None
+
+def wgdnums(wgds):
+    return "{"+" ".join( str(w.num) for w in wgds)+"}"
 
 def conjuction(a, b):
     if a is False or b is False: return False
@@ -93,7 +96,7 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
     Args:
         st: Tree - a species tree
         gt: Tree - a gene tree with "?" nodes
-        wgd_nodes: Set[Node] - allowed duplication epidodes
+        wgd_nodes: Set[Node] - allowed duplication episdodes
         wgddebug: Bool - if True print additional debug info
         excludedoutgroup: str - a label excluded from leaf mapping reconstructions
 
@@ -253,7 +256,7 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
 
 
     
-    for (s,g) in itertools.product(st.nodes,gt.nodes):
+    for (s,g) in itertools.product(st.nodes, gt.nodes):
         delta_down(s,g)    
         delta(s,g)    
 
@@ -266,9 +269,317 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
         # pptabs("dd",deltadownv,deltadown_usage)
         # pptabs("si",sigmav,sigma_usage)
 
-    if is_valid is True:
+    if is_valid is True:             
         return is_valid, node_usage, gt.nodemaprepr(dict(leafmap))
     return False, set(), ""
+
+
+
+def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, Set[Node], str, str]:
+
+    """
+    Checks whether S and G can be reconciled using WGD events from a given set nodes of S
+
+    Args:
+        st: Tree - a species tree
+        gt: Tree - a gene tree with "?" nodes
+        wgd_nodes: Set[Node] - allowed duplication episdodes
+        wgddebug: Bool - if True print additional debug info
+        excludedoutgroup: str - a label excluded from leaf mapping reconstructions
+
+    Returns:
+        a tuple contating
+        - Bool: if there is a feasible scenario using wgd_nodes
+        - Set[Node]: the set of used episodes from wgd_nodes
+        - str: reconstructed gene tree (no ?) if exists
+        - str: reconstructed embedding 
+    """
+
+    class EmbNode:
+        def __init__(self, s, com:str):                        
+            self.s = s
+            self.com = com
+
+        def __str__(self):
+            #return f"stmapnum={self.s.num} com='{self.com}'"
+            return f"{self.s.num}"           
+             
+        def __repr__(self):
+            return self.__str__()
+
+        def toepisode(self, path):
+            e = self
+            for s in path:                 
+                e = EmbSingle(e, s.s, s.com)
+            return e
+
+        def embeddings(self, stroot):
+            if excludedoutgroup and self.s == stroot: 
+                return self._embeddings(stroot)
+            s = self.__str__()
+            return [ s ] if s else []            
+
+        def setepisize(self):
+            pass
+
+
+    class EmbInternal(EmbNode):
+        def __init__(self, left, right, s, com):
+            EmbNode.__init__(self, s, com)
+            self.left = left
+            self.right = right
+
+        def __str__(self):    
+            sl = self.left.__str__()        
+            sr = self.right.__str__()           
+            if not sl:
+                return sr
+            if not sr: 
+                return sl 
+            return f"({sl},{sr}){self.event()} {super().__str__()}"
+
+        def _embeddings(self, stroot):            
+            return self.left.embeddings(stroot) + self.right.embeddings(stroot)
+
+        def setepisize(self):
+            self.left.setepisize()
+            self.right.setepisize()
+
+
+    class EmbDuplication(EmbInternal):
+        def event(self): return "+"
+
+        def setepisize(self):
+            self.s.episize += 1            
+            super().setepisize()
+
+            
+    class EmbSpeciation(EmbInternal):
+        def event(self): return "~"
+
+    class EmbUnknown(EmbInternal):
+        def event(self): return "?"
+
+        def toepisode(self, path):            
+            return EmbDuplication(self.left.toepisode(path), self.right.toepisode(path), path[-1].s, path[-1].com+"-ue")            
+
+    class EmbSingle(EmbNode):
+        def __init__(self, child, s, com):
+            EmbNode.__init__(self, s, com)
+            self.child = child            
+
+        def __str__(self):
+            #return f"({self.child}) stmapnum={self.s.num} com='{self.com}'"
+            return f"({self.child}) {self.s.num}"
+
+        def toepisode(self, path):
+            return self.child.toepisode([self] + path)
+
+        def _embeddings(self, stroot):
+            return self.child.embeddings(stroot)
+
+        def setepisize(self):
+            self.child.setepisize()            
+
+    class EmbLeaf(EmbNode):        
+        def __str__(self):
+            if self.s.label == excludedoutgroup: return ""
+            #return f"{self.s.label} {super().__str__()}"
+            return super().__str__()
+
+        def _embeddings(self, stroot):            
+            return []
+            
+
+
+    deltav = {}
+    delta_usage = {}
+    delta_leafmap = {}
+    delta_embedding = {}
+
+    deltadownv = {}
+    deltadown_usage = {}
+    deltadown_leafmap = {}
+    deltadown_embedding = {}
+
+    sigmav = {}
+    sigma_usage = {}
+    sigma_leafmap = {}
+    sigma_embedding = {}
+
+    def delta(s: Node, g: Node) -> Tuple[bool , Set[Node], Tuple[Tuple[Node, str]]]:
+        """ g maps to s and g is a duplication
+            g not a leaf
+            Return F U T
+        """
+        if (s, g) in deltav:
+            return deltav[s, g], delta_usage[s, g], delta_leafmap[s, g], delta_embedding[s, g]
+
+        is_reconciled, usage, leafmap, embedding = False, set(), dict(), ''
+
+        if not g.leaf():
+            # if g.num in (2,4): print(ppn(g),ppn(s),"D - sigma",is_reconciled)
+
+            for left, right in (g.c, (g.c[1], g.c[0])):
+
+                is_reconciled_left, usage_left, leafmap_left, embedding_left = deltaexact(s, left) # F U T                
+
+                # optimize if is_reconciled_left is False
+                if is_reconciled_left is False: continue
+
+                is_reconciled_right, usage_right, leafmap_right, embedding_right = delta_down(s, right) # F U T                
+
+                is_reconciled = conjuction(is_reconciled_left, is_reconciled_right)
+
+                if s in wgd_nodes:
+                    is_reconciled = Mop(is_reconciled)  # Mop is True or False                    
+                
+                    if is_reconciled is True:
+                        usage = usage_left | usage_right | {s}
+                        leafmap = leafmap_left + leafmap_right
+                        embedding = EmbDuplication(embedding_left,embedding_right, s, 'de-epi')
+                        break
+                else:
+                    # s not in wgd_nodes
+                    is_reconciled = conjuction(is_reconciled, Unknown)  # with Unknown
+
+                    if is_reconciled is Unknown:
+                        usage = usage_left | usage_right
+                        leafmap = leafmap_left + leafmap_right
+                        embedding = EmbUnknown(embedding_left, embedding_right,s,"de")
+                        break
+
+        deltav[s, g] = is_reconciled
+        delta_usage[s, g] = usage
+        delta_leafmap[s, g] = leafmap
+        delta_embedding[s, g] = embedding
+        return is_reconciled, usage, leafmap, embedding
+
+    # with embedding
+    def deltaexact(s, g):
+        """ g maps to s
+            Return F U T
+        """
+
+        is_reconciled, usage, leafmap, embedding = sigma(s, g)  # T or F
+        if is_reconciled is True:
+            return is_reconciled, usage, leafmap, embedding
+
+        return delta(s, g)
+
+    # with embedding
+    def delta_down(s: Node, g: Node) -> Tuple[bool, Set[Node], Tuple[Tuple[Node, str]]]:
+        """ g maps to s or below
+            Return F U T
+        """
+
+        if (s, g) in deltadownv:
+            return deltadownv[s, g], deltadown_usage[s, g], deltadown_leafmap[s, g], deltadown_embedding[s, g]
+
+        is_reconciled, usage, leafmap, embedding = deltaexact(s, g)  # F U T     
+
+        usageadd = {}
+
+        if is_reconciled is not True:
+
+            for c in s.c:
+
+                is_reconciled2, usage2, leafmap2, embedding2 = delta_down(c, g) # F U T
+
+                wgdsolved = False
+                
+                if s in wgd_nodes:
+
+                    if is_reconciled2 is Unknown:
+                        usage2 = usage2 | {s} # duplication is digested here
+                    
+                        # raise uknown duplications                                   
+                        embedding2 = EmbSingle(embedding2, s,'dd1').toepisode([])            
+                        wgdsolved = True
+
+                    is_reconciled2 = Mop(is_reconciled2)
+
+                if is_reconciled2 is True or is_reconciled2 is Unknown and is_reconciled is False:
+                    is_reconciled, usage, leafmap = is_reconciled2, usage2, leafmap2                                            
+                    embedding = embedding2 if wgdsolved else EmbSingle(embedding2, s, 'dd2')                    
+                    if is_reconciled is True:
+                        break
+
+        deltadownv[s, g] = is_reconciled
+        deltadown_usage[s, g] = usage
+        deltadown_leafmap[s, g] = leafmap
+        deltadown_embedding[s, g] = embedding
+
+        return is_reconciled, usage, leafmap, embedding
+
+    def sigma(s: Node, g: Node) -> Tuple[bool, Set[Node], Tuple[Tuple[Node, str]]]:
+        """
+        g maps to s and (g speciation or g a leaf)
+        Return F T
+        """
+        if (s, g) in sigmav:
+            return sigmav[s, g], sigma_usage[s, g], sigma_leafmap[s, g], sigma_embedding[s, g]
+
+        if s.reticulation:
+            is_reconciled, usage, leafmap, embedding = sigma(s.c[0], g)
+            return is_reconciled, usage, leafmap, EmbSingle(embedding, s, 'rt')
+
+        embedding = ''
+
+        if s.leaf() and g.leaf():
+            is_reconciled, usage, leafmap = g.label == s.label or g.label[0] == "?", set(), tuple()
+            if g.label[0] == "?":
+                if s.label == excludedoutgroup:
+                    is_reconciled = False
+                else:
+                    leafmap = ((g, s.label),)
+            if is_reconciled:
+                embedding = EmbLeaf(s, 'si')
+
+        elif not s.leaf() and not g.leaf():
+            is_reconciled, usage, leafmap = False, set(), tuple()            
+            for left, right in ((s.c[0], s.c[1]), (s.c[1], s.c[0])):
+                is_reconciled_left, usage_left, leafmap_left, embedding_left = delta_down(left, g.c[0])
+
+                if is_reconciled_left is False: continue
+
+                is_reconciled_right, usage_right, leafmap_right, embedding_right = delta_down(right, g.c[1])
+
+                is_reconciled = Lop(conjuction(is_reconciled_right, is_reconciled_left))
+
+                if is_reconciled:
+                    usage = usage_left | usage_right
+                    leafmap = leafmap_left + leafmap_right
+                    embedding = EmbSpeciation(embedding_left, embedding_right, s, 'si')
+                    break
+        else:
+            is_reconciled, usage, leafmap = False, set(), tuple()
+        sigmav[s, g] = is_reconciled
+        sigma_usage[s, g] = usage
+        sigma_leafmap[s, g] = leafmap
+        sigma_embedding[s, g] = embedding
+        return is_reconciled, usage, leafmap, embedding
+
+
+    
+    for (s,g) in itertools.product(st.nodes, gt.nodes):
+        delta_down(s,g)    
+        delta(s,g)    
+
+    is_valid, node_usage, leafmap, embedding = delta_down(st.root, gt.root)
+
+    #wgddebug=True
+    if wgddebug:
+        pptabs3(st, gt, deltav, deltadownv, sigmav, delta_usage, deltadown_usage, sigma_usage)
+        # pptabs("d ",deltav,delta_usage)
+        # pptabs("dd",deltadownv,deltadown_usage)
+        # pptabs("si",sigmav,sigma_usage)
+
+    if is_valid is True:        
+        return embedding
+
+    return None
+
 
 def totalcount(d):
     if not d: return 0
@@ -316,7 +627,7 @@ def sumcounts(*dicts):
     return None
 
 
-def is_reconciled_using_wgd_withcounts(net: Network, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> [bool, dict]:
+def is_reconciled_using_wgd_withcounts(net: Network, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, dict]:
     """
     Checks whether S and G can be reconciled using WGD events from a given set nodes of S with g->s map counts
 
@@ -545,26 +856,26 @@ def is_reconciled_using_wgd_withcounts(net: Network, gt: Tree, wgd_nodes: Set[No
         
         return is_reconciled
 
-    is_valid = delta_down_wc(st.root, gt.root)
+    is_valid = delta_down_wc(net.root, gt.root)
 
-    for (s,g) in itertools.product(st.nodes,gt.nodes):
+    for (s,g) in itertools.product(net.nodes,gt.nodes):
         delta_down_wc(s,g)    
         delta_wc(s,g)    
 
     if wgddebug:
-        pptabs3(st, gt, deltav, deltadownv, sigmav)
+        pptabs3(net, gt, deltav, deltadownv, sigmav)
 
         pptabsc("d ",deltav, delta_countsT, delta_countsU)
         pptabsc("dd",deltadownv, deltadown_countsT, deltadown_countsU)
         pptabsc("si",sigmav, sigma_counts, {})
-        deltaexactv = { (s,g):deltaexact_wc(s,g) for (s,g) in itertools.product(st.nodes,gt.nodes)}
+        deltaexactv = { (s,g):deltaexact_wc(s,g) for (s,g) in itertools.product(net.nodes,gt.nodes)}
         pptabsc("dx",deltaexactv, deltaexact_countsT, deltaexact_countsU)
 
         # ddv = { (s,g):delta_down_wc(s,g) for (s,g) in itertools.product(st.nodes,gt.nodes)}
         # pptabsc("dd2",ddv, deltadown_countsT, deltadown_countsU)
 
     if is_valid is True:        
-        return is_valid, deltadown_countsT[st.root, gt.root]
+        return is_valid, deltadown_countsT[net.root, gt.root]
     return False,None
 
 """
@@ -605,7 +916,7 @@ def combine_gene_trees(gtrees: List[Tree], outgroup: str = "outgroup") -> Tree:
 Add outgroup to a tree or a network
 """
 def add_outgroup(network: Network, outgroup: str) -> Tree:    
-    return network.__class__(str2tree(f"({str(network)},{outgroup})"))
+    return network.__class__(str2tree(f"({str(network)},{outgroup})"),outgroup=outgroup)
 
 
 """
@@ -627,7 +938,8 @@ def count_wgd_nodes_combined(
         gtrees: List[Tree], 
         outgroup: str = "outgroup", 
         wgddebug = False, 
-        outfile = None,
+        out_file = None, # dir + full out file
+        out_basefile = None, # dir + base name of out file          
         noimprovement_stop=0,
         randomize_from=0,
         setid=None,
@@ -637,9 +949,13 @@ def count_wgd_nodes_combined(
         reference_trees = None,
         distribution_maps_epi = False,
         print_distr_maps = False,
+        save_embedding = False,
         verbose = 1,
         distr_counts = False,
-        gsestyle = False
+        gsestyle = False,
+        user_episodes = None,
+        fixed_episodes_ext = None,
+        find_fixed_episodes = True
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -653,6 +969,13 @@ def count_wgd_nodes_combined(
     gtree = combine_gene_trees(gtrees, outgroup)
     network = add_outgroup(network, outgroup)
 
+    if out_basefile:        
+        with open(f'{out_basefile}gt.newick','w') as f:
+            f.write(str(gtree))
+
+        with open(f'{out_basefile}net.newick','w') as f:
+            f.write(str(network))
+
     if reference_trees:
         reference_tree = combine_gene_trees(reference_trees)
     else:
@@ -660,7 +983,8 @@ def count_wgd_nodes_combined(
 
     return count_wgd_nodes(network, gtree,  outgroup, 
         wgddebug=wgddebug, 
-        outfile=outfile,
+        out_file=out_file,
+        out_basefile=out_basefile,        
         noimprovement_stop=noimprovement_stop, 
         randomize_from=randomize_from, 
         setid=setid, 
@@ -670,9 +994,13 @@ def count_wgd_nodes_combined(
         reference_tree=reference_tree,
         distribution_maps_epi = distribution_maps_epi,
         print_distr_maps = print_distr_maps,
+        save_embedding = save_embedding,
         verbose = verbose,
         distr_counts=distr_counts,
-        gsestyle = gsestyle)
+        gsestyle = gsestyle,
+        user_episodes = user_episodes,
+        fixed_episodes_ext = fixed_episodes_ext,
+        find_fixed_episodes = find_fixed_episodes)
 
 def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
 
@@ -788,7 +1116,8 @@ def count_wgd_nodes(
         gt: Tree, 
         outgroup: str = 'outgroup', 
         wgddebug=False, 
-        outfile=None,
+        out_file=None,
+        out_basefile=None,
         noimprovement_stop=0,
         randomize_from=0,
         setid=None,
@@ -797,17 +1126,21 @@ def count_wgd_nodes(
         distribution_maps = False,
         reference_tree = None,
         distribution_maps_epi = False,   # tree for distribution validation; must have the same topology as gt
-        print_distr_maps = False,        
+        print_distr_maps = False,
+        save_embedding = False,        
         verbose = 1,
         distr_counts = False,
-        gsestyle = False
+        gsestyle = False,
+        user_episodes = None,
+        fixed_episodes_ext = None,
+        find_fixed_episodes = True
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
     in order to reconcile S and a gene tree with ?
 
     Outgroup is requred in initial_gene_tree, reference_tree, gt and st
-        outfile - appends report results 
+        out_file - appends report results 
 
     """
 
@@ -834,20 +1167,58 @@ def count_wgd_nodes(
         gt_inferred_str = random_labelling(gt, st, outgroup)        
 
     # Compute some initial cost             
-    best_cost, best_wgd_nodes = recnet([Tree(str2tree(gt_inferred_str))], st)
+    best_cost, best_wgd_nodes = reconcileNetECapprox([Tree(str2tree(gt_inferred_str))], st)
         
-    if outfile:
-        with open(outfile+".genetree","w") as f:
-            f.write(gt_inferred_str)
-
     outstats = f"initialgenetree={initial_gene_tree}\n"
-    outstats+= f"initialgenetreecost={best_cost}\n"
+    outstats += f"initialgenetreecost={best_cost}\n"
 
     if speciestreeonly:
         fixed_wgd_nodes = fixedec(gt, st)
-    else:
-        # TODO, fixedec for networks
-        fixed_wgd_nodes = set()
+    else:        
+        fixed_wgd_nodes = fixedecnet(gt, st)           
+
+
+    def convertnums(l):
+        return (v for v in st.nodes if v.num in l )        
+
+    if fixed_episodes_ext:
+        for v in convertnums(fixed_episodes_ext):
+            fixed_wgd_nodes.add(v) 
+        
+    user_wgd_episodes = set()
+    if user_episodes:        
+        if user_episodes=='all':
+            user_episodes = [ v.num for v in st.nodes ]        
+
+        for v in convertnums(user_episodes):            
+            print("User episode:",v.num, v)
+            user_wgd_episodes.add(v)                
+    
+    if fixed_wgd_nodes:
+        print("Fixed episodes:",wgdnums(fixed_wgd_nodes))
+
+    # Identify more fixed episodes based on the current best_wgd_nodes
+
+    if find_fixed_episodes and len(fixed_wgd_nodes)!=len(st.nodes):
+        if verbose == 2:    
+            print("Locating additional fixed episodes among", wgdnums(best_wgd_nodes))
+
+        for wgd in best_wgd_nodes:
+            if wgd in fixed_wgd_nodes:
+                continue
+            # exclude present
+            current_wgdnodes = list(set(st.root.nodes()).difference([wgd]))            
+
+            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, current_wgdnodes, excludedoutgroup=outgroup)   
+
+            if is_feasible:
+                print (f"Node {wgd.num} is not fixed episode. EC={len(used_wgd_nodes)}")
+            else:
+                print (f"Node {wgd.num} {'(root) ' if not wgd.parent else ''}is fixed episode!")
+                if wgd in user_episodes:
+                    if verbose==2:
+                        print(f"Fixed episode {wgd.num} in user episodes")                    
+                fixed_wgd_nodes.add(wgd)
 
     maxec = len(st.root.nodes()) 
     potential_wgd_nodes = list(set(st.root.nodes()) - fixed_wgd_nodes)
@@ -868,6 +1239,7 @@ def count_wgd_nodes(
     outstats+=f"{speciestreelab}=\"{st}\"\n"
     outstats+=f"{speciestreelab}fixedwgd=\"{st.root.markrepr(fixed_wgd_nodes)}\"\n"
     outstats+=f"fixedwgd={len(fixed_wgd_nodes)}\n"
+    outstats+=f"userwgdepisodes={len(user_wgd_episodes)}\n"
     outstats+=f"reversed_climb={reversed_climb}\n"
     outstats+=f"unknownlabels={unklabs}\n"
 
@@ -906,16 +1278,12 @@ def count_wgd_nodes(
     if not unklabs:
         exactsolution = True
 
-
-
-    def reporterror(outfile, info, outstats):            
+    def reporterror(out_file, info, outstats):            
         f = open("metaec.err.log","a")
-        f.write(f"\n========={outfile}============\n")
+        f.write(f"\n========={out_file}============\n")
         f.write(outstats)        
         f.close()
-        raise Exception(f"[{outfile}] {info}. See metaec.err.log for details")
-
-
+        raise Exception(f"[{out_file}] {info}. See metaec.err.log for details")
 
     def getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup):
 
@@ -925,7 +1293,7 @@ def count_wgd_nodes(
         _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
 
         if dpdistr is None:
-            reporterror(outfile, "No distribution map (dpdistr is None)", outstats)
+            reporterror(out_file, "No distribution map (dpdistr is None)", outstats)
 
         tr, distrsum = gtwithdistrmaps(st, gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts)
         stats="gtdistrmaps="+tr+"\n"
@@ -946,119 +1314,166 @@ def count_wgd_nodes(
        
     else:
 
-        # perform the search
-        
-        while unklabs:
-
-            all_explored_stop = False
-
-            if reversed_climb:
-                if cur_cost_search == best_cost:                     
-                    break
-                k = cur_cost_search - len(fixed_wgd_nodes)
-            else:
-                if best_cost == len(fixed_wgd_nodes):   
-                    if verbose:
-                        print(f"[{setid}] Best cost = fixed wgds. Stop: {best_cost}/{maxec}")                                     
-                    break                    
-                k = best_cost - len(fixed_wgd_nodes) - 1
-
-            comb = math.comb(len(potential_wgd_nodes),k)
-
-            samplingsets = not (not randomize_from or randomize_from>comb)
-
-
-      
+        if user_wgd_episodes:
+            wgd_node_set = set(user_wgd_episodes) | fixed_wgd_nodes
+            
             if verbose:
-                print(f"[{setid}] EC:{best_cost}/{maxec} Test:{k+len(fixed_wgd_nodes)} FxdWgd:{len(fixed_wgd_nodes)} PotentialEpi:{len(potential_wgd_nodes)} K:{k} Comb:{comb} RndSmpl:{samplingsets} StopAfter:{noimprovement_stop} UnknwnLbls:{unklabs}")
+                print(f"[{setid}] EC:{best_cost}/{maxec} Test:UserEpisodes FxdWgd:{len(fixed_wgd_nodes)} UnknwnLbls:{unklabs}")
 
-            if samplingsets:
-                wgd_node_sets = randcombinations(potential_wgd_nodes, k)
+            if verbose == 2:
+                print(f"DP start with WGD={wgdnums(wgd_node_set)}", end="...")                       
+            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)   
+
+            if is_feasible:
+                gt_inferred_str = gt_inferred_str_cur                    
+                gt_inferred = Tree(str2tree(gt_inferred_str))
+
+                if verbose:
+                    print(f"[{setid}] Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec} ")
+
+                best_cost, best_wgd_nodes = len(used_wgd_nodes), used_wgd_nodes
             else:
-                wgd_node_sets = itertools.combinations(potential_wgd_nodes, k)        
-            
+                if verbose:
+                    print(f"[{setid}] user episodes + fixed episodes are not feasible?")
 
-            cnt = 0
-            for wgd_nodes in wgd_node_sets:                        
+        else:
 
-                # Test combination                
+        # perform the search    
+            while True: # prev while unklabls
 
-                wgd_node_set = set(wgd_nodes) | fixed_wgd_nodes                       
-                is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)   
+                all_explored_stop = False
 
-                cnt+=1
-                dpcalls+=1
-                dpfromlastimprovement+=1                
-        
-                if is_feasible:
-                    gt_inferred_str = gt_inferred_str_cur                    
-                    gt_inferred = Tree(str2tree(gt_inferred_str))
-
-                    if verbose:
-                        print(f"[{setid}] Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec}")
-
-                    if speciestreeonly:                                        
-                        ec, used_ec_nodes = rec({gt_inferred}, st)
-                        
-                        if ec>len(used_wgd_nodes):
-                            raise Exception(f"Incorrect EC>DP cost {ec}>{used_wgd_nodes}")
-
-                        if ec<len(used_wgd_nodes):
-                            print(f"[{setid}] Found EC solution with ec={len(ec)}/{maxec}")                            
-                        # Update from EC algorithm                        
-                        best_cost, best_wgd_nodes = ec, used_ec_nodes
-
-                    else:
-                        # Network case, accept feasible                       
-                        best_cost, best_wgd_nodes = len(used_wgd_nodes), used_wgd_nodes
-                                        
-                    dpfromlastimprovement = 0            
-
-                    if reversed_climb:
-                        # solution found
-                        exactsolution = not sampling_occured 
-                        stop = True    
-
-                    if outfile:
-                        with open(outfile+".genetree","w") as f:
-                            f.write(gt_inferred_str)                    
-            
-                    break # the loop           
-                
-                if noimprovement_stop and dpfromlastimprovement>=noimprovement_stop:                    
-                    exactsolution = False # unknown
-                    stop = True
-                    if verbose:
-                        print(f"[{setid}] Stopping criterion reached (no exact solution). Stop with {best_cost}/{maxec}")                                     
-                    break
-            else:   
-                # all combinations explored
-                
-                if reversed_climb: # no solution located; search in larger
-                    cur_cost_search+=1
+                if reversed_climb:
+                    if cur_cost_search == best_cost:                     
+                        break
+                    k = cur_cost_search - len(fixed_wgd_nodes)
                 else:
-                    exactsolution = True  # no solution located; accept current (exact)
-                    stop = True
-                    if verbose:
-                        print(f"[{setid}] All combinations explored. Stop with the current best cost: {best_cost}/{maxec}")
+                    if best_cost == len(fixed_wgd_nodes):   
+                        if verbose:
+                            print(f"[{setid}] Best cost = fixed wgds. Stop: {best_cost}/{maxec}")                                     
+                        break                    
+                    k = best_cost - len(fixed_wgd_nodes) - 1       
 
-            sampling_occured |= samplingsets # important in reverse climb
-            
-            if climbs: climbs+=";"
+                comb = math.comb(len(potential_wgd_nodes),k)
 
-            climbs+=f"{k};{cnt};{comb}"
+                samplingsets = not (not randomize_from or randomize_from>comb)
+          
+                if verbose:
+                    print(f"[{setid}] EC:{best_cost}/{maxec} Test:{k+len(fixed_wgd_nodes)} FxdWgd:{len(fixed_wgd_nodes)} PotentialEpi:{len(potential_wgd_nodes)} K:{k} Comb:{comb} RndSmpl:{samplingsets} StopAfter:{noimprovement_stop} UnknwnLbls:{unklabs}")
+               
+                if samplingsets:
+                    wgd_node_sets = randcombinations(potential_wgd_nodes, k)
+                else:
+                    wgd_node_sets = itertools.combinations(potential_wgd_nodes, k)        
+
+                if verbose == 2:
+                    print(f"Potential wgd nodes+fixed: {wgdnums(potential_wgd_nodes)}+{wgdnums(fixed_wgd_nodes)}")                                       
+                cnt = 0
+                for wgd_nodes in wgd_node_sets:                        
+
+                    # Test combination                
+
+                    wgd_node_set = set(wgd_nodes) | fixed_wgd_nodes
+
+                    if verbose == 2:
+                        print(f"DP start with WGD={wgdnums(wgd_node_set)}", end="...")                       
+                    is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)   
+
+                    if verbose == 2:
+                        print(f" feasible={is_feasible} with {wgdnums(used_wgd_nodes)}")                       
+
+                    cnt+=1
+                    dpcalls+=1
+                    dpfromlastimprovement+=1                
             
-            if stop:          
-                break
+                    if is_feasible:
+                        gt_inferred_str = gt_inferred_str_cur                    
+                        gt_inferred = Tree(str2tree(gt_inferred_str))
+
+                        if verbose:
+                            print(f"[{setid}] Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec} ")
+
+                        if speciestreeonly:                                        
+                            ec, used_ec_nodes = reconcileEC({gt_inferred}, st)
+                            
+                            if ec>len(used_wgd_nodes):
+                                raise Exception(f"Incorrect EC>DP cost {ec}>{used_wgd_nodes}")
+
+                            if ec<len(used_wgd_nodes):
+                                print(f"[{setid}] Found EC solution with ec={len(ec)}/{maxec}")                            
+                            # Update from EC algorithm                        
+                            best_cost, best_wgd_nodes = ec, used_ec_nodes
+
+                        else:
+                            # Network case, accept feasible                       
+                            best_cost, best_wgd_nodes = len(used_wgd_nodes), used_wgd_nodes
+                                            
+                        dpfromlastimprovement = 0            
+
+                        if reversed_climb:
+                            # solution found
+                            exactsolution = not sampling_occured 
+                            stop = True    
+
+                        if out_basefile:
+                            with open(out_basefile+"genetree","w") as f:
+                                f.write(gt_inferred_str)                    
+                
+                        break # the loop           
+                    
+                    if noimprovement_stop and dpfromlastimprovement>=noimprovement_stop:                    
+                        exactsolution = False # unknown
+                        stop = True
+                        if verbose:
+                            print(f"[{setid}] Stopping criterion reached (no exact solution). Stop with {best_cost}/{maxec}")                                     
+                        break
+                else:   
+                    # all combinations explored
+                    
+                    if reversed_climb: # no solution located; search in larger
+                        cur_cost_search+=1
+                    else:                    
+                        exactsolution = True  # no solution located; accept current (exact)
+                        stop = True
+                        if verbose:
+                            print(f"[{setid}] All combinations explored. Stop with the current best cost: {best_cost}/{maxec}")
+
+                sampling_occured |= samplingsets # important in reverse climb
+                
+                if climbs: climbs+=";"
+
+                climbs+=f"{k};{cnt};{comb}"
+                
+                if stop:          
+                    break
         
 
         outstats+=f"climbs={climbs}\n"
         outstats+=f"samplingsets={samplingsets}\n"
         outstats+=f"outgenetree=\"{gt_inferred_str}\"\n"
-        
 
-    for n in best_wgd_nodes:
-        n.epibestwgd = 1
+    if save_embedding:
+        
+        embeddings = is_reconciled_using_wgd_withembedding(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
+
+        if not speciestreeonly:
+            
+            for n in st.nodes:  
+                n.episize=0
+                n.epibestwgd = 0
+
+            for n in best_wgd_nodes:
+                n.epibestwgd = 1
+
+            # set episize from embeddings data
+            embeddings.setepisize()
+
+        with open(f"{out_basefile}embedding","w") as f:
+            if outgroup:
+                for t in embeddings.embeddings(st.root):           
+                    f.write(f"&t {t}\n")
+            else:
+                f.write(f"&t {t}\n")
     
     outstats+=f"bestcost={best_cost}\n"
     outstats+=f"dpcalls={dpcalls}\n"
@@ -1069,13 +1484,13 @@ def count_wgd_nodes(
     if outgrouped:
 
         gt_wo = split_outgrouped_tree(Tree(str2tree(gt_inferred_str)), outgroup)        
-        st_wo = Network(str2tree(stroot.netrepr()))
+        st_wo = Network(str2tree(stroot.netrepr()))        
 
         if speciestreeonly:
 
             # recompute ec to get epicounts for wo
             # only for trees
-            worec, ecn = rec(gt_wo, st_wo)
+            worec, ecn = reconcileEC(gt_wo, st_wo)
 
             # check correctness
             a = 'episize'
@@ -1094,7 +1509,7 @@ def count_wgd_nodes(
 
             outstats+=f"bestcost_worec={worec}\n"
             if worec != best_cost-eccorrection:
-                reporterror(outfile, "Inconsistency in EC cost computation {worec} {best_cost-eccorrection}.", outstats)
+                reporterror(out_file, "Inconsistency in EC cost computation {worec} {best_cost-eccorrection}.", outstats)
 
         gt_inferred_str_wo = ";".join(str(t) for t in gt_wo )
 
@@ -1107,6 +1522,8 @@ def count_wgd_nodes(
             _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
             tr, distrsum = gtwithdistrmaps(st, gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts)
             print(tr + f" distrsum={distrsum}")
+
+        
 
         outstats+=f"outgenetrees_wo=\"{gt_inferred_str_wo}\"\n"        
         outstats+=f"bestcost_wo={best_cost-eccorrection}\n"

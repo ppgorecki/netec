@@ -170,10 +170,15 @@ class Node:
     def __repr__(self):
         return str(self)
 
-    def nodes(self):  # postorder
+    def nodes(self, par=None):  # postorder
         if self.leaf():
             return [self]
-        return sum((t.nodes() for t in self.c), [self])
+
+        # ugly
+        if hasattr(self,'reticulation') and self.reticulation and par == self.rghparent:
+            return []
+
+        return sum((t.nodes(self) for t in self.c), [self])
 
     def get_nodes(self):   # postorder for binary trees
         if self.leaf():
@@ -240,6 +245,11 @@ class Node:
         val = (retusage & self.left_reticulation_used()) + (retusage & self.right_reticulation_used())
         val //= self.left_reticulation_used()
         return val
+    
+    def sibling(self):
+        if self.parent:
+            return self.parent.c[1 - self.parent.c.index(self)]
+        return None
 
     def nodemaprepr(self, nodemap):
         """
@@ -306,8 +316,8 @@ class Node:
             return self.clusterleaf + s
         
         r = ''
-        if self.reticulation:
-            r = '#' + self.retid
+        if self.reticulation:            
+            r = ('' if gsestyle else '#')+self.retid
             if self.rghparent == par:            
                 return r
 
@@ -323,9 +333,38 @@ class Node:
                 except:
                     continue
         return 0
+    
+    def subnettrees(self, par=None):
+        """
+        Returns a list of subtrees of network
+        """
+        if self.leaf():
+            return True, [self]
 
+        if self.reticulation:
+            if self.rghparent!=par:
+                return False, self.c[0].subnettrees(self)[1]
+            return False, [] # ignore to avoid duplicates
 
+        res = [ t.subnettrees(self) for t in self.c ]
+        if all(sb for sb, _ in res):
+            return True, [self] 
+        return False, sum((t for _, t in res), [])
+    
+    def subtrees(self, cluster):        
+        # Locate max subtrees whose leaves labels are in cluster
+        if self.parent:
+            if self.cluster.issubset(cluster):
+                if not self.parent.cluster.issubset(cluster):
+                    return [self]
+                return []
+            return sum((t.subtrees(cluster) for t in self.c), [])        
+        # root case
+        if self.cluster.issubset(cluster):
+            return [self]
+        return sum((t.subtrees(cluster) for t in self.c), [])        
 
+        
 
 class Tree:
     def __init__(self, tup):
@@ -338,10 +377,7 @@ class Tree:
                 tup = (tup, t)
 
         self.root = Node(tup, None)
-        self.nodes = self.root.nodes()
-        for i, n in enumerate(self.nodes):
-            n.num = i
-            n.artificial = False
+        self.setnodes()
         self.src = tup
 
         if self.srclist:
@@ -349,6 +385,23 @@ class Tree:
             for i in range(len(self.srclist) - 1):
                 l.artificial = True
                 l = l.l
+
+    def setnodes(self, outgroup=None):
+        self.nodes = self.root.nodes()                
+        num = 0
+        # needed to preserve proper num nodes in networks        
+        for i, n in enumerate(self.nodes):
+            n.artificial = False
+            if outgroup:
+                if n.leaf() and n.clusterleaf==outgroup:
+                    n.num = len(self.nodes)-2
+                    continue
+                if n == self.root: 
+                    n.num = len(self.nodes)-1
+                    continue
+            n.num = num
+            num += 1
+
 
     def leaves(self):
         return self.root.leaves()
