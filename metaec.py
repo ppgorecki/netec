@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run WGD reconciliation algorithm for input network/tree and gene trees with ?")
     
-    parser.add_argument("--gene_trees", help="Path to a file with newline separated gene trees", type=str, default="data_sim/wgd-1-gene-trees")
+    parser.add_argument("--gene_trees", help="Path to a file with newline separated gene trees", type=str, default=None)
     
     parser.add_argument("--network", help="Path to a file with a species network", type=str, default=None)
     
@@ -78,7 +78,13 @@ def main():
             fixed_episodes_ext = list(map(int,args.fixed_episodes_ext.split()))
         except:
             print("Incorrect format of fixed episodes. Example '2 4 10'", file=sys.stderr)
+            args.print_help()
             sys.exit(-1)
+
+    if not args.gene_trees:
+        print("Gene trees not specified", file=sys.stderr)
+        parser.print_help()
+        sys.exit(-1)
 
     gene_trees = open(args.gene_trees).read().split()
     gene_trees = [ Tree(str2tree(g_str)) for g_str in gene_trees]
