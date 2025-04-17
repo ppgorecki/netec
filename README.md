@@ -1,4 +1,4 @@
-# NetEC: Duplicatin episodes in phylogenetic networks
+# NetEC: Duplication episodes in phylogenetic networks
 
 ### Single file processing 
 
