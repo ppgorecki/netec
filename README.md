@@ -1,68 +1,14 @@
-# MetaEC: Simultaneous reconstruction of duplication episodes and gene-species mappings
-
-Inferring gene-species assignments and genomic duplication events.
-
-See WABI 2023 article:
-
-Simultaneous reconstruction of duplication episodes and gene-species mappings 
-Paweł Górecki, Natalia Rutecka, Agnieszka Mykowiecka and Jarosław Paszek
-
-The package originated from the embretnet repository https://bitbucket.org/pgor17/embretnet/src/meta_DP.
+# NetEC: Duplicatin episodes in phylogenetic networks
 
 ### Single file processing 
 
 Run metaec.py for a single inference.
 
+See also https://bitbucket.org/pgor17/pandanales with an example of large data set processing
 
 ### Multiple files processing 
 
-Run metaec_multiset.sh to perform MetaEC multiset analysis and output results in the specified output directory as a "wgd.csv" file.
-
-Requirements for metaec_multiset.sh:
-
-* csvmanip is downloaded automatically from https://github.com/ppgorecki/csvmanip using git
-* gnu parallel
-
-To process yeast dataset:
-
-```
-> metaec_multiset.sh -R50 -N50 -j10 -o yeast_out -d data_yeast data_yeast/gtrees_0.[0-6]*
-```
-
-To process simulated dataset (6 wgd scenarios x {0.0 .. 0.6} x 100):
-
-```
-> metaec_multiset.sh -R50 -N100 -j6 -o sim_out -d data_sim_inferred_final data_sim_inferred_final/wgd-[0-5]-*_0.[0-6]*
-```
-
-If the analysis is interrupted, running the command again will resume processing from where it left off. Note that the output files could be large (e.g., ~3GB).
-
-Please contact us if you want to obtain directly wgd.csv files.
-
-Here: 
-
-*	`-R 50` - randomize from binom(n,k)>50 in the main loop
-*	`-N 100` - stop if DP will not improve after 100 executions
-*	`-j 10` - run 10 jobs in parallel
-*	`-o DIR` - store results in directory DIR
-*	`-d DIR` - input directory 
-*	`data_sim/wgd-[1-5]-*_0*` - files to process
-
-To get more detailed help execute:
-```
-> metaec_multiset.sh
-```
-
-### Simulated datasets preparation
-
-In `simulations` directory we provided scripts used to simulate gene trees. 
-
-Requirements:
-
-*	SimPhy 1.0
-*	INDELible V1.03
-*	urec 2.04  (https://bitbucket.org/pgor17/urec)
-*	FastTree version 2.1.11 (single precision variant)
+See the main README.md in the master branch.
 
 ### Questions ###
 
@@ -72,4 +18,4 @@ For questions contact:
 
 ### Funding
 
-The support was provided by National Science Centre grant #2019/33/B/ST6/00737.
+The support was provided by National Science Centre grants #2019/33/B/ST6/00737 (tree version) and #2023/51/B/ST6/02792 (network).
