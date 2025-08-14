@@ -113,11 +113,11 @@ def main():
         with open(args.reference_trees) as f:
             reference_trees = [ Tree(str2tree(g_str)) for g_str in f.read().split() ]
 
-    out_file = args.out_file      
+    out_file = args.out_file          
     out_basefile="" 
     out_dir = "."+os.path.sep
     if out_file:
-        if os.path.isdir(out_file):
+        if os.path.isdir(out_file):            
             out_dir = out_file
             out_file = out_dir + os.path.sep + "metaec.log" # default
             out_basefile = out_dir + os.path.sep 

@@ -13,6 +13,7 @@ class Network(Tree):
         Tree.__init__(self, tup)
 
         # recognize reticulations
+
         dlf = {}
         din = {}
         err = 0
@@ -27,6 +28,9 @@ class Network(Tree):
                     dlf[retid] = n
                     n.reticulationleaf = 1
                 else:
+                    if len(n.c)!=1:
+                        print(f"Reticulation {retid} should have a single child a newick tree. Insert parenthesis inside {n}")
+                        err = 1
                     if retid in din:
                         print("Reticulation id <%s> already defined" % retid)
                         err = 1

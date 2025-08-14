@@ -1165,7 +1165,7 @@ def count_wgd_nodes(
     else:        
         # initialize upper bound using random gene tree
         gt_inferred_str = random_labelling(gt, st, outgroup)        
-
+    
     # Compute some initial cost             
     best_cost, best_wgd_nodes = reconcileNetECapprox([Tree(str2tree(gt_inferred_str))], st)
         
@@ -1214,7 +1214,7 @@ def count_wgd_nodes(
             if is_feasible:
                 print (f"Node {wgd.num} is not fixed episode. EC={len(used_wgd_nodes)}")
             else:
-                print (f"Node {wgd.num} {'(root) ' if not wgd.parent else ''}is fixed episode!")
+                print (f"Node {wgd.num} {'(root) ' if not wgd.parent else '' }is fixed episode!")
                 if wgd in user_episodes:
                     if verbose==2:
                         print(f"Fixed episode {wgd.num} in user episodes")                    
