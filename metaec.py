@@ -27,7 +27,7 @@ def main():
     
     parser.add_argument("--initial_gene_tree", help="Path to a file with the initial gene tree (already precomputed)", type=str, default=None)
     
-    parser.add_argument("--out_file", help="Path to an output file with results", type=str, default="")
+    parser.add_argument("--out_file", help="Path to an output file or directory with results", type=str, default="")
     
     parser.add_argument("--randomize_from", help="Start randomizing from a given size of binom(n,k) in the main loop", type=int, default=0)
     
@@ -55,6 +55,8 @@ def main():
     parser.add_argument("--fixed_episodes_ext", help="User defined list of fixed episodes; use if episodes are known to be used in order to optimize computations", type=str, default='')    
 
     parser.add_argument("--no_fixed_episodes_search", help="Skip fixed episode search using DP (def. False)",   action='store_true')
+
+    parser.add_argument("--locked_epi_support", help="For every gene tree and every net node identify locked episodes",  action='store_true')
 
 
 
@@ -123,7 +125,57 @@ def main():
             out_basefile = out_dir + os.path.sep 
         else:
             if len(out_file)>5 and out_file[-3]=='.':
-                out_basefile = out_file[:-3]                
+                out_basefile = out_file[:-3]      
+
+    if args.locked_epi_support:        
+
+        locked_episodes = []
+        for gt in gene_trees:
+            net, locked_epi = count_wgd_nodes_combined(
+                network, 
+                [gt], 
+                wgddebug = False,             
+                out_file = None,
+                out_basefile = out_basefile,
+                noimprovement_stop = args.noimprovement_stop,
+                randomize_from = args.randomize_from,
+                setid = setid,        
+                reversed_climb = args.reversed_climb,
+                initial_gene_tree = initial_gene_tree,
+                distribution_maps = args.distribution_maps,
+                reference_trees = reference_trees,
+                distribution_maps_epi = args.distribution_maps_epi,
+                print_distr_maps = args.print_distr_maps,
+                save_embedding = args.save_embedding,
+                outgroup="o",
+                verbose=args.verbose,
+                distr_counts=args.distr_counts,
+                gsestyle=args.gsestyle,
+                user_episodes = user_episodes,
+                fixed_episodes_ext = fixed_episodes_ext,
+                find_fixed_episodes = not args.no_fixed_episodes_search,
+                locked_epi_support = args.locked_epi_support
+            )
+            locked_episodes.append(locked_epi)            
+
+        d = {}
+        with open(out_basefile+"locked_epi",'w') as f:
+            for i in locked_episodes:
+                f.write(" ".join(str(e.num) for e in i)+"\n")
+
+                for e in i:
+                    if e.num not in d: d[e.num]=0
+                    d[e.num]+=1
+
+        for n in net.nodes:
+            if n.num in d:
+                n.lockedepisupport = d[n.num]
+
+        with open(out_basefile+"locked_epi_net",'w') as f:
+            f.write(net.root.attrrepr(['num','lockedepisupport'], gsestyle=args.gsestyle))
+                
+        return
+
 
     cost, used_nodes, exactsolution, outstats = count_wgd_nodes_combined(
             network, 
@@ -147,7 +199,7 @@ def main():
             gsestyle=args.gsestyle,
             user_episodes = user_episodes,
             fixed_episodes_ext = fixed_episodes_ext,
-            find_fixed_episodes = not args.no_fixed_episodes_search
+            find_fixed_episodes = not args.no_fixed_episodes_search            
             )
 
     endtime = time.process_time() - t

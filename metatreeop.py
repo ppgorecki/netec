@@ -955,7 +955,8 @@ def count_wgd_nodes_combined(
         gsestyle = False,
         user_episodes = None,
         fixed_episodes_ext = None,
-        find_fixed_episodes = True
+        find_fixed_episodes = True,
+        locked_epi_support = False
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -1000,6 +1001,7 @@ def count_wgd_nodes_combined(
         gsestyle = gsestyle,
         user_episodes = user_episodes,
         fixed_episodes_ext = fixed_episodes_ext,
+        locked_epi_support = locked_epi_support,
         find_fixed_episodes = find_fixed_episodes)
 
 def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
@@ -1133,7 +1135,8 @@ def count_wgd_nodes(
         gsestyle = False,
         user_episodes = None,
         fixed_episodes_ext = None,
-        find_fixed_episodes = True
+        find_fixed_episodes = True,
+        locked_epi_support = False,
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -1195,7 +1198,7 @@ def count_wgd_nodes(
             user_wgd_episodes.add(v)                
     
     if fixed_wgd_nodes:
-        print("Fixed episodes:",wgdnums(fixed_wgd_nodes))
+        print("Fixed episodes:", wgdnums(fixed_wgd_nodes))
 
     # Identify more fixed episodes based on the current best_wgd_nodes
 
@@ -1219,6 +1222,9 @@ def count_wgd_nodes(
                     if verbose==2:
                         print(f"Fixed episode {wgd.num} in user episodes")                    
                 fixed_wgd_nodes.add(wgd)
+
+    if locked_epi_support:        
+        return st, fixed_wgd_nodes
 
     maxec = len(st.root.nodes()) 
     potential_wgd_nodes = list(set(st.root.nodes()) - fixed_wgd_nodes)
