@@ -54,6 +54,7 @@ This shows that 1 duplication episode explains all gene tree duplications.
 ### With Output File
 
 ```bash
+mkdir -p results
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
@@ -74,6 +75,7 @@ Use `--verbose 2` to print the WGD nodes used in the solution.
 ## Working with Real Data (Yeast Dataset)
 
 ```bash
+mkdir -p results
 python3 metaec.py \
     --gene_trees data_yeast/gtrees \
     --network data_yeast/s_tree \
@@ -154,6 +156,7 @@ python3 metaec.py \
 Generate a species tree/network with episode size attributes:
 
 ```bash
+mkdir -p results
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
@@ -166,6 +169,7 @@ python3 metaec.py \
 Save the inferred gene-species mapping:
 
 ```bash
+mkdir -p results
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
@@ -225,6 +229,9 @@ python3 metaec.py \
 ## Complete Example Workflow
 
 ```bash
+# Create output directory
+mkdir -p results/yeast
+
 # 1. Analyze gene trees from simulation data
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
@@ -264,6 +271,7 @@ https://bitbucket.org/pgor17/pandanales
 
 Example shell script pattern:
 ```bash
+mkdir -p results
 for file in data_sim/wgd-1-gene-trees_*; do
     python3 metaec.py \
         --gene_trees "$file" \
