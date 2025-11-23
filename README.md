@@ -189,18 +189,6 @@ python3 metaec.py \
 cat results/embedding
 ```
 
-### Distribution Maps
-
-Add distribution maps to the output:
-
-```bash
-python3 metaec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --distribution_maps \
-    --print_distr_maps
-```
-
 ### Performance Optimization
 
 For large datasets, use randomization to speed up computation:
