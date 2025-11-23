@@ -26,7 +26,7 @@ This represents a network where node `#A` has two parents. The reticulation is d
 
 ### Gene Trees
 
-A text file with one gene tree per line in Newick format. Gene labels should match species labels (duplications appear as repeated labels).
+A text file with one gene tree per line in Newick format. Gene labels should match species labels.
 
 **Example** (`gene_trees.txt`):
 ```
@@ -61,6 +61,16 @@ python3 metaec.py \
     --out_file results/output.log
 ```
 
+### With Output Dir (recommended)
+
+```bash
+mkdir -p results
+python3 metaec.py \
+    --gene_trees data_sim/wgd-1-gene-trees \
+    --network data_sim/s_tree \
+    --out_file results
+```
+
 ### With Verbose Output
 
 ```bash
@@ -79,7 +89,7 @@ mkdir -p results
 python3 metaec.py \
     --gene_trees data_yeast/gtrees \
     --network data_yeast/s_tree \
-    --out_file results/yeast_analysis.log
+    --out_file results
 ```
 
 ## Working with Networks (Reticulations)
@@ -160,8 +170,9 @@ mkdir -p results
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
-    --out_file results/ \
+    --out_file results \
     --episummaryfile
+cat results/episummary
 ```
 
 ### Save Embedding
@@ -173,8 +184,9 @@ mkdir -p results
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
-    --out_file results/output \
+    --out_file results \
     --save_embedding
+cat results/embedding
 ```
 
 ### Distribution Maps
