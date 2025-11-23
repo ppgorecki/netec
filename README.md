@@ -299,6 +299,54 @@ for file in data_sim/wgd-1-gene-trees_*; do
 done
 ```
 
+## Fasturec Integration
+
+[Fasturec](https://bitbucket.org/pgor17/fasturec) is a tool for inferring species trees from gene trees using duplication cost minimization. You can use Fasturec to infer a species tree, then analyze duplication episodes with NetEC.
+
+> **Note:** This workflow requires a species tree (no reticulations/networks).
+
+### Installation
+
+```bash
+git clone git@bitbucket.org:pgor17/fasturec.git
+cd fasturec && make
+```
+
+### Workflow
+
+**1. Infer species tree from gene trees:**
+
+```bash
+fasturec -q10 -Y -G gt.txt -oft
+cut -f1 fu.txt > st.txt
+```
+
+- `-q10`: Quick search with 10 random restarts
+- `-Y`: Use Yale (YDC) duplication cost
+- `-G gt.txt`: Input gene trees file
+- `-oft`: Output full tree info to `fu.txt`
+- The `cut` command extracts the species tree from Fasturec output
+
+**2. View duplication statistics:**
+
+```bash
+python3 metaec.py \
+    --network st.txt \
+    --gene_trees gt.txt \
+    --print_dup_stats
+```
+
+**3. Run episode analysis with filtered trees:**
+
+```bash
+python3 metaec.py \
+    --network st.txt \
+    --gene_trees gt.txt \
+    --mindup 4
+```
+
+Using `--mindup 4` filters out gene trees with fewer than 4 duplications, focusing the analysis on trees with more duplication signal.
+
 ## Questions
 
 For questions contact: <gorecki@mimuw.edu.pl>
