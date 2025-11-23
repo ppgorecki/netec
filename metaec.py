@@ -58,7 +58,9 @@ def main():
 
     parser.add_argument("--locked_epi_support", help="For every gene tree and every net node identify locked episodes",  action='store_true')
 
+    parser.add_argument("--mindup", help="Filter gene trees with duplication count < MINDUP (only for networks with no reticulations, i.e., trees; ignored for networks); default is 0", type=int, default=0)
 
+    parser.add_argument("--print_dup_stats", help="Print duplication statistics: for each k=0,1,2,... show how many gene trees have k duplications", action='store_true')
 
     args = parser.parse_args()
 
@@ -91,14 +93,43 @@ def main():
     gene_trees = open(args.gene_trees).read().split()
     gene_trees = [ Tree(str2tree(g_str)) for g_str in gene_trees]
 
-    # To be conistent with the orignal species tree version
-    #if args.network:    
     network, netclass = args.network, Network
-    #else:
-    #    network, netclass = args.species_tree, Tree
-
     network = netclass(str2tree(open(network).read()))
-    
+
+    # Filter gene trees based on mindup parameter (only for trees, not networks)
+    if args.mindup > 0:
+        if len(network.reticulations) == 0:
+            original_count = len(gene_trees)
+            filtered_gene_trees = []
+            for gt in gene_trees:
+                gt.set_lca_mapping(network)
+                if gt.dupcost(network) >= args.mindup:
+                    filtered_gene_trees.append(gt)
+            gene_trees = filtered_gene_trees
+            if args.verbose:
+                print(f"Filtered gene trees: {original_count} -> {len(gene_trees)} (mindup={args.mindup})")
+        else:
+            if args.verbose:
+                print(f"Warning: --mindup parameter ignored (network has {len(network.reticulations)} reticulation(s))")
+
+    # Print duplication statistics if requested
+    if args.print_dup_stats:
+        dup_counts = {}
+        for gt in gene_trees:
+            if not hasattr(gt.root, 'lcamap'):  # Check if LCA mapping already exists
+                gt.set_lca_mapping(network)
+            dup_cost = gt.dupcost(network)
+            dup_counts[dup_cost] = dup_counts.get(dup_cost, 0) + 1
+
+        print("Duplication statistics:")
+        if dup_counts:
+            max_dup = max(dup_counts.keys())
+            for k in range(max_dup + 1):
+                count = dup_counts.get(k, 0)
+                print(f"  {k} duplications: {count} gene tree(s)")
+        else:
+            print("  No gene trees to analyze")
+
     t = time.process_time()
     
     setid=re.sub('[A-Za-z/-]','',args.gene_trees)
