@@ -130,6 +130,8 @@ def main():
         else:
             print("  No gene trees to analyze")
 
+        return
+
     t = time.process_time()
     
     setid=re.sub('[A-Za-z/-]','',args.gene_trees)

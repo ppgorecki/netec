@@ -201,6 +201,8 @@ python3 metaec.py \
     --print_distr_maps
 ```
 
+Note: use with species trees only (no reticulations in networks).
+
 ### Performance Optimization
 
 For large datasets, use randomization to speed up computation:
@@ -235,6 +237,7 @@ Use GSE (Gene tree Species tree Embedding) format for output attributes:
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
+    --out_file results
     --gsestyle
 ```
 
@@ -242,13 +245,13 @@ python3 metaec.py \
 
 ```bash
 # Create output directory
-mkdir -p results/yeast
+mkdir -p results/sim results/yeast
 
 # 1. Analyze gene trees from simulation data
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
-    --out_file results/sim_analysis.log \
+    --out_file results/sim \
     --print_dup_stats \
     --verbose 1
 
@@ -260,12 +263,15 @@ python3 metaec.py \
     --episummaryfile \
     --save_embedding
 
-# 3. Quick analysis filtering low-duplication trees
+# 3. Filtering of low-duplication trees (for non-reticulation networks)
+for mindup in 1 2 3 4; do
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
-    --mindup 1 \
-    --verbose 1
+    --mindup $mindup \
+    --verbose 1 \
+    --out_file results/sim/mindup"$mindup".log
+done
 ```
 
 ## Output Files
@@ -283,12 +289,13 @@ https://bitbucket.org/pgor17/pandanales
 
 Example shell script pattern:
 ```bash
-mkdir -p results
 for file in data_sim/wgd-1-gene-trees_*; do
+	DIR="results/$(basename $file)"
+	mkdir -p $DIR
     python3 metaec.py \
         --gene_trees "$file" \
         --network data_sim/s_tree \
-        --out_file "results/$(basename $file).log"
+        --out_file $DIR
 done
 ```
 
@@ -298,6 +305,5 @@ For questions contact: <gorecki@mimuw.edu.pl>
 
 ## Funding
 
-This work was supported by National Science Centre grants:
-- #2019/33/B/ST6/00737 (tree version)
-- #2023/51/B/ST6/02792 (network)
+This work was supported by National Science Centre grant:
+- #2023/51/B/ST6/02792 (networks)

@@ -14,7 +14,7 @@ import statistics
 Unknown = None
 
 def wgdnums(wgds):
-    return "{"+" ".join( str(w.num) for w in wgds)+"}"
+    return "{"+" ".join( str(w.num) for w in sorted(wgds,key=lambda k: k.num))+"}"
 
 def conjuction(a, b):
     if a is False or b is False: return False
