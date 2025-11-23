@@ -14,7 +14,7 @@ import statistics
 Unknown = None
 
 def wgdnums(wgds):
-    return "{"+" ".join( str(w.num) for w in wgds)+"}"
+    return "{"+" ".join( str(w.num) for w in sorted(wgds,key=lambda k: k.num))+"}"
 
 def conjuction(a, b):
     if a is False or b is False: return False
@@ -1249,7 +1249,7 @@ def count_wgd_nodes(
     outstats+=f"reversed_climb={reversed_climb}\n"
     outstats+=f"unknownlabels={unklabs}\n"
 
-    if outgrouped:        
+    if outgrouped:
         gts_split = split_outgrouped_tree(gt, outgroup)
         stroot = strootnooutgroup = st.root.c[0]
         eccorrection = 1 if len(gts_split)>1 else 0 # additional dupliaction if two trees are present
@@ -1260,6 +1260,8 @@ def count_wgd_nodes(
         outstats+=f"{speciestreelab}fixedwgd_wo=\"{stroot.markrepr(fixed_wgd_nodes)}\"\n"
         outstats+=f"fixedwgd_wo={len(fixed_wgd_nodes)-eccorrection}\n"
         outstats+=f"#end (wo)\n"
+
+        st.root.trueroot = stroot # needed in distr counting
 
     else:
         stroot = st.root
