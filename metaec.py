@@ -148,15 +148,24 @@ def main():
         with open(args.reference_trees) as f:
             reference_trees = [ Tree(str2tree(g_str)) for g_str in f.read().split() ]
 
-    out_file = args.out_file          
-    out_basefile="" 
+    out_file = args.out_file
+    out_basefile=""
     out_dir = "."+os.path.sep
     if out_file:
-        if os.path.isdir(out_file):            
-            out_dir = out_file
+        # Check if out_file is meant to be a directory (ends with separator or is an existing directory)
+        if out_file.endswith(os.path.sep) or os.path.isdir(out_file):
+            out_dir = out_file.rstrip(os.path.sep)
+            # Create directory if it doesn't exist
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir, exist_ok=True)
             out_file = out_dir + os.path.sep + "metaec.log" # default
-            out_basefile = out_dir + os.path.sep 
+            out_basefile = out_dir + os.path.sep
         else:
+            # Create parent directory if it doesn't exist
+            out_file_dir = os.path.dirname(out_file)
+            if out_file_dir and not os.path.exists(out_file_dir):
+                os.makedirs(out_file_dir, exist_ok=True)
+
             if len(out_file)>5 and out_file[-3]=='.':
                 out_basefile = out_file[:-3]      
 
