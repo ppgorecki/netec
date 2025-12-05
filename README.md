@@ -112,6 +112,107 @@ python3 metaec.py \
 
 ## Advanced Options
 
+### Debug Output
+
+NetEC provides detailed debug output for the dynamic programming algorithm:
+
+```bash
+# No debug output (default)
+python3 metaec.py \
+    --gene_trees netsmp/gt.txt \
+    --network netsmp/net.txt \
+    --dpdebug 0
+
+# Table format - shows DP tables for all node pairs
+python3 metaec.py \
+    --gene_trees netsmp/gt.txt \
+    --network netsmp/net.txt \
+    --dpdebug 1
+
+# Nested notation format - shows network with DP values as labels
+python3 metaec.py \
+    --gene_trees netsmp/gt.txt \
+    --network netsmp/net.txt \
+    --dpdebug 2
+```
+
+**Example output with `--dpdebug 1`** (table format):
+```
+   SN                      GN                   De Dd Si Ep | deu ddu siu
+10 a5a5b6b6c2d8o9#10  0 a4a6b7c2o8#0    F  T  T  T  | {} {3} {3}
+ 0 a5a5b6b6c2d8#0   0 a4a6b7c2o8#0    F  F  F  F  | {} {} {}
+ 1 a5b6c2#1         0 a4a6b7c2o8#0    F  F  F  F  | {} {} {}
+...
+```
+
+**Example output with `--dpdebug 2`** (nested notation with annotations):
+```
+((c nid=2 cluster='c' netecdp="|aabc F F F F|c F T T T|..." wgdnode=1,
+  ((a nid=5 cluster='a' netecdp="|..." wgdnode=1,
+    b nid=6 cluster='b' netecdp="|..." wgdnode=1
+   ) nid=4 cluster='ab' netecdp="|..." wgdnode=1
+  )#A nid=3 cluster='ab' netecdp="|..." wgdnode=1 wgdused=1
+ ) nid=1 cluster='abc' netecdp="|..." wgdnode=1,
+ (d nid=8 cluster='d' netecdp="|..." wgdnode=1,
+  #A nid=3 cluster='ab' netecdp="|..." wgdnode=1 wgdused=1
+ ) nid=7 cluster='abd' netecdp="|..."
+) nid=10 cluster='aabbcdo' netecdp="|..." wgdnode=1 is_valid=True node_usage={3}
+```
+
+The `--dpdebug 2` option outputs the network in nested notation with annotations:
+- `nid=NUM` - Node ID
+- `cluster='...'` - Leaf labels below the node
+- `netecdp="..."` - DP table values (De, Dd, Si, Ep) for each gene tree cluster
+- `wgdnode=1` - Node is a candidate WGD episode
+- `wgdused=1` - Node is actually used in the reconciliation
+- `is_valid=True/False` - Whether reconciliation succeeded (at root)
+- `node_usage={...}` - Set of used WGD node IDs (at root)
+
+### DP-Only Mode
+
+Run only the dynamic programming algorithm with a specific set of WGD nodes on a single gene tree:
+
+```bash
+# Test specific WGD nodes
+python3 metaec.py \
+    --gene_trees netsmp/gt.txt \
+    --network netsmp/net.txt \
+    --run_dponly "3"
+
+# Test multiple WGD nodes
+python3 metaec.py \
+    --gene_trees netsmp/gt.txt \
+    --network netsmp/net.txt \
+    --run_dponly "1 4 5"
+
+# With debug output
+python3 metaec.py \
+    --gene_trees netsmp/gt.txt \
+    --network netsmp/net.txt \
+    --run_dponly "3" \
+    --dpdebug 2
+```
+
+**Example output:**
+```
+Running DP-only mode:
+  Network: ((c,((a,b))#A),(d,#A))
+  Gene tree: (c,(a,(a,b)))
+  WGD nodes: [3]
+
+Result:
+  is_valid: True
+  node_usage: {3}
+  inferred_tree: (c,(a,(a,b)))
+```
+
+The `--run_dponly` option:
+- Takes space-separated node numbers (e.g., "1 4 5")
+- Uses only the first gene tree from the input
+- Calls `is_reconciled_using_wgd` directly
+- Returns whether reconciliation is valid and which nodes were used
+- Works with all `--dpdebug` levels for detailed output
+
 ### Filtering Gene Trees by Duplication Count
 
 Filter out gene trees with fewer than N duplications:

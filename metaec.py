@@ -44,6 +44,10 @@ def main():
 
     parser.add_argument("--episummaryfile", help="Save the species/network with the episize attributes", action="store_true")
 
+    parser.add_argument("--dpdebug", help="Debug level: 0 - none (default), 1 - print DP tables, 2 - nested notation with labels", type=int, default=0)
+
+    parser.add_argument("--run_dponly", help="Run only DP algorithm with specified WGD nodes (e.g., '1 4 5') on single gene tree", type=str, default='')
+
     parser.add_argument("--verbose", help="0 - none, 1 - basic, 2 - print wgd nodes", type=int, default=1)
 
     parser.add_argument("--distr_counts", help="Do not normalize distr maps", action='store_true')
@@ -132,8 +136,61 @@ def main():
 
         return
 
+    # Handle --run_dponly mode
+    if args.run_dponly:
+        if len(gene_trees) == 0:
+            print("Error: No gene trees provided for --run_dponly mode")
+            return
+
+        # Parse WGD node numbers from string like "1 4 5"
+        try:
+            wgd_node_nums = set(int(x) for x in args.run_dponly.split())
+        except ValueError:
+            print(f"Error: Invalid --run_dponly format '{args.run_dponly}'. Expected space-separated numbers like '1 4 5'")
+            return
+
+        # Map node numbers to actual nodes
+        wgd_nodes = set()
+        for node in network.nodes:
+            if node.num in wgd_node_nums:
+                wgd_nodes.add(node)
+
+        if len(wgd_nodes) != len(wgd_node_nums):
+            found_nums = {n.num for n in wgd_nodes}
+            missing = wgd_node_nums - found_nums
+            print(f"Warning: Some node numbers not found in network: {missing}")
+
+        # Use only the first gene tree
+        gt = gene_trees[0]
+
+        print(f"Running DP-only mode:")
+        print(f"  Network: {network.root}")
+        print(f"  Gene tree: {gt}")
+        print(f"  WGD nodes: {sorted(n.num for n in wgd_nodes)}")
+        print()
+
+        # Import and call is_reconciled_using_wgd
+        from metatreeop import is_reconciled_using_wgd
+
+        is_valid, node_usage, gt_inferred_str = is_reconciled_using_wgd(
+            network,
+            gt,
+            wgd_nodes,
+            dpdebug=args.dpdebug,
+            excludedoutgroup="o"
+        )
+
+        print()
+        print(f"Result:")
+        print(f"  is_valid: {is_valid}")
+        print(f"  node_usage: {{{', '.join(str(n.num) for n in sorted(node_usage, key=lambda x: x.num))}}}")
+        if gt_inferred_str:
+            print(f"  inferred_tree: {gt_inferred_str}")
+
+        return
+
     t = time.process_time()
-    
+
     setid=re.sub('[A-Za-z/-]','',args.gene_trees)
     setid=re.sub('^_*','',setid)
 
@@ -176,7 +233,7 @@ def main():
             net, locked_epi = count_wgd_nodes_combined(
                 network, 
                 [gt], 
-                wgddebug = False,             
+                dpdebug = args.dpdebug,             
                 out_file = None,
                 out_basefile = out_basefile,
                 noimprovement_stop = args.noimprovement_stop,
@@ -222,7 +279,7 @@ def main():
     cost, used_nodes, exactsolution, outstats = count_wgd_nodes_combined(
             network, 
             gene_trees, 
-            wgddebug = False,             
+            dpdebug = args.dpdebug,             
             out_file = out_file,
             out_basefile = out_basefile,
             noimprovement_stop = args.noimprovement_stop,

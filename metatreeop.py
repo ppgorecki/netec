@@ -72,24 +72,127 @@ def pptabsc(nm, v,  dT, dU):
     for s, g in v:
         print(nm, ppn(s), ppn(g), logic3str(v[s, g]), ppc(dT.get((s,g),{}),"t"), " ;;; ",ppc(dU.get((s,g),{}),"u"), )
 
-def pptabs3(st, gt, de, dd, si, deu, ddu, siu):
+def pptabs3(st, gt, de, dd, si, deu, ddu, siu, dpdebug=1, is_valid=None, node_usage=None, wgd_nodes=None):
+    """Print DP tables in different formats based on debug level.
+
+    Args:
+        dpdebug: 0 - no output, 1 - table format, 2 - nested notation with labels
+        is_valid: bool - whether reconciliation is valid (for dpdebug=2)
+        node_usage: Set[Node] - set of used WGD nodes (for dpdebug=2)
+        wgd_nodes: Set[Node] - set of allowed WGD nodes (for dpdebug=2)
+    """
+    if dpdebug == 0:
+        return
+    elif dpdebug == 1:
+        # Table format
+        def eps(s, g):
+            if (s, g) in de and (s, g) in si:
+                return logic3str(disjunction(de[s, g], si[s, g]))
+            return "-"
+
+        def ppu(u):
+            return "{"+" ".join(str(v.num) for v in u)+"}"
+
+        print(f"   {'SN':20}    {'GN':20} De Dd Si Ep | deu ddu siu")
+        for g, s in itertools.product(gt.nodes, st.nodes):
+            print(
+                f"{s.num:2} {ppn(s):15} {g.num:2} {ppn(g):15} {logic3str(de.get((s, g), '-'))}  {logic3str(dd.get((s, g), '-'))}  {logic3str(si.get((s, g), '-'))}  {eps(s, g)}  | {ppu(deu.get((s,g), set()))} {ppu(ddu.get((s,g), set()))} {ppu(siu.get((s,g), set()))}")
+    elif dpdebug == 2:
+        # Nested notation with labels
+        print_network_with_dp_labels(st, gt, de, dd, si, deu, ddu, siu, is_valid, node_usage, wgd_nodes)
+
+
+def print_network_with_dp_labels(st, gt, de, dd, si, deu, ddu, siu, is_valid=None, node_usage=None, wgd_nodes=None):
+    """Print network in nested notation with DP table values as node labels.
+
+    Args:
+        is_valid: bool - whether reconciliation is valid
+        node_usage: Set[Node] - set of used WGD nodes
+        wgd_nodes: Set[Node] - set of allowed WGD nodes
+    """
+    if node_usage is None:
+        node_usage = set()
+    if wgd_nodes is None:
+        wgd_nodes = set()
+
     def eps(s, g):
         if (s, g) in de and (s, g) in si:
             return logic3str(disjunction(de[s, g], si[s, g]))
         return "-"
 
-    def ppu(u):
-        return "{"+" ".join(str(v.num) for v in u)+"}"
+    def get_cluster_name(g):
+        """Get cluster name for gene tree node (sorted leaf labels)."""
+        return "".join(sorted(l.clusterleaf for l in g.leaves()))
 
-    print(f"   {'SN':20}    {'GN':20} De Dd Si Ep | deu ddu siu")
-    for g, s in itertools.product(gt.nodes, st.nodes):
-        print(
-            f"{s.num:2} {ppn(s):15} {g.num:2} {ppn(g):15} {logic3str(de.get((s, g), '-'))}  {logic3str(dd.get((s, g), '-'))}  {logic3str(si.get((s, g), '-'))}  {eps(s, g)}  | {ppu(deu[s,g])} {ppu(ddu[s,g])} {ppu(siu[s,g])}")
-        # print(nm,ppn(g),ppn(s),logic3str(v[s,g]))
+    def build_label_for_node(s):
+        """Build label string for species tree/network node s."""
+        label_parts = []
+        for g in gt.nodes:
+            cluster = get_cluster_name(g)
+            de_val = logic3str(de.get((s, g), '-'))
+            dd_val = logic3str(dd.get((s, g), '-'))
+            si_val = logic3str(si.get((s, g), '-'))
+            ep_val = eps(s, g)
+            # Format: cluster followed by De Dd Si Ep values
+            label_parts.append(f"{cluster:<6} {de_val}  {dd_val}  {si_val}  {ep_val}")
+        return "|" + "|".join(label_parts)
+
+    def node_to_str_with_label(node, parent=None):
+        """Convert node to nested notation string with DP label."""
+        label_str = build_label_for_node(node)
+
+        # Build additional attributes
+        attrs = []
+
+        # Add node ID
+        attrs.append(f'nid={node.num}')
+
+        # Add cluster (sorted leaf labels below this node)
+        cluster_str = "".join(sorted(l.clusterleaf for l in node.leaves()))
+        attrs.append(f"cluster='{cluster_str}'")
+
+        attrs.append(f'netecdp="{label_str}"')
+
+        # Add wgdnode attribute if node is in wgd_nodes
+        if node in wgd_nodes:
+            attrs.append('wgdnode=1')
+
+        # Add wgdused attribute if node is in node_usage
+        if node in node_usage:
+            attrs.append('wgdused=1')
+
+        attr_str = " ".join(attrs)
+
+        if node.leaf():
+            return f'{node.clusterleaf} {attr_str}'
+
+        # Handle reticulation nodes for networks
+        s = ''
+        if node.reticulation:
+            s = '#' + node.retid
+            if node.rghparent == parent:
+                return s + f' {attr_str}'
+
+        children_str = ",".join(node_to_str_with_label(c, node) for c in node.c)
+        return f'({children_str}){s} {attr_str}'
+
+    # Build the tree/network string
+    result = node_to_str_with_label(st.root)
+
+    # Add is_valid and node_usage at the root level
+    if is_valid is not None:
+        valid_str = "True" if is_valid else "False"
+        result += f' is_valid={valid_str}'
+
+    if node_usage:
+        usage_nums = ",".join(str(n.num) for n in sorted(node_usage, key=lambda x: x.num))
+        result += f' node_usage={{{usage_nums}}}'
+
+    print(result)
 
 
 
-def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, Set[Node], str]:
+def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], dpdebug=0, excludedoutgroup="") -> Tuple[bool, Set[Node], str]:
     """
     Checks whether S and G can be reconciled using WGD events from a given set nodes of S
 
@@ -97,7 +200,7 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
         st: Tree - a species tree
         gt: Tree - a gene tree with "?" nodes
         wgd_nodes: Set[Node] - allowed duplication episdodes
-        wgddebug: Bool - if True print additional debug info
+        dpdebug: int - debug level (0=none, 1=table, 2=nested notation)
         excludedoutgroup: str - a label excluded from leaf mapping reconstructions
 
     Returns:
@@ -106,6 +209,8 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
         - Set[Node]: the set of used episodes from wgd_nodes
         - str: a reconstructed gene tree (no ?) if exists
     """
+
+    #print("=========", wgd_nodes, {n.num for n in wgd_nodes})
 
     deltav = {}
     delta_usage = {}
@@ -262,9 +367,8 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
 
     is_valid, node_usage, leafmap = delta_down(st.root, gt.root)
 
-    #wgddebug=True
-    if wgddebug:
-        pptabs3(st, gt, deltav, deltadownv, sigmav, delta_usage, deltadown_usage, sigma_usage)
+    if dpdebug > 0:
+        pptabs3(st, gt, deltav, deltadownv, sigmav, delta_usage, deltadown_usage, sigma_usage, dpdebug, is_valid, node_usage, wgd_nodes)
         # pptabs("d ",deltav,delta_usage)
         # pptabs("dd",deltadownv,deltadown_usage)
         # pptabs("si",sigmav,sigma_usage)
@@ -275,7 +379,7 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
 
 
 
-def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, Set[Node], str, str]:
+def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Node], dpdebug=0, excludedoutgroup="") -> Tuple[bool, Set[Node], str, str]:
 
     """
     Checks whether S and G can be reconciled using WGD events from a given set nodes of S
@@ -284,7 +388,7 @@ def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Nod
         st: Tree - a species tree
         gt: Tree - a gene tree with "?" nodes
         wgd_nodes: Set[Node] - allowed duplication episdodes
-        wgddebug: Bool - if True print additional debug info
+        dpdebug: int - debug level (0=none, 1=table, 2=nested notation)
         excludedoutgroup: str - a label excluded from leaf mapping reconstructions
 
     Returns:
@@ -568,9 +672,9 @@ def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Nod
 
     is_valid, node_usage, leafmap, embedding = delta_down(st.root, gt.root)
 
-    #wgddebug=True
-    if wgddebug:
-        pptabs3(st, gt, deltav, deltadownv, sigmav, delta_usage, deltadown_usage, sigma_usage)
+    #dpdebug=True
+    if dpdebug > 0:
+        pptabs3(st, gt, deltav, deltadownv, sigmav, delta_usage, deltadown_usage, sigma_usage, dpdebug, is_valid, node_usage, wgd_nodes)
         # pptabs("d ",deltav,delta_usage)
         # pptabs("dd",deltadownv,deltadown_usage)
         # pptabs("si",sigmav,sigma_usage)
@@ -627,15 +731,15 @@ def sumcounts(*dicts):
     return None
 
 
-def is_reconciled_using_wgd_withcounts(net: Network, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, dict]:
+def is_reconciled_using_wgd_withcounts(net: Network, gt: Tree, wgd_nodes: Set[Node], dpdebug=0, excludedoutgroup="") -> Tuple[bool, dict]:
     """
     Checks whether S and G can be reconciled using WGD events from a given set nodes of S with g->s map counts
 
-    Args:   
+    Args:
         net: Network - a network
         gt: Tree - a gene tree with "?" nodes
         wgd_nodes: Set[Node] - allowed duplication epidodes
-        wgddebug: Bool - if True print additional debug info
+        dpdebug: int - debug level (0=none, 1=table, 2=nested notation)
         excludedoutgroup: str - a label excluded from leaf mapping reconstructions
 
     Returns:
@@ -862,8 +966,8 @@ def is_reconciled_using_wgd_withcounts(net: Network, gt: Tree, wgd_nodes: Set[No
         delta_down_wc(s,g)    
         delta_wc(s,g)    
 
-    if wgddebug:
-        pptabs3(net, gt, deltav, deltadownv, sigmav)
+    if dpdebug > 0:
+        pptabs3(net, gt, deltav, deltadownv, sigmav, {}, {}, {}, dpdebug)
 
         pptabsc("d ",deltav, delta_countsT, delta_countsU)
         pptabsc("dd",deltadownv, deltadown_countsT, deltadown_countsU)
@@ -937,7 +1041,7 @@ def count_wgd_nodes_combined(
         network: Network, 
         gtrees: List[Tree], 
         outgroup: str = "outgroup", 
-        wgddebug = False, 
+        dpdebug = False, 
         out_file = None, # dir + full out file
         out_basefile = None, # dir + base name of out file          
         noimprovement_stop=0,
@@ -983,7 +1087,7 @@ def count_wgd_nodes_combined(
         reference_tree = None
 
     return count_wgd_nodes(network, gtree,  outgroup, 
-        wgddebug=wgddebug, 
+        dpdebug=dpdebug, 
         out_file=out_file,
         out_basefile=out_basefile,        
         noimprovement_stop=noimprovement_stop, 
@@ -1114,10 +1218,10 @@ def randcombinations(X,k):
         yield sample(X, k)
 
 def count_wgd_nodes(
-        st: Network, 
-        gt: Tree, 
-        outgroup: str = 'outgroup', 
-        wgddebug=False, 
+        st: Network,
+        gt: Tree,
+        outgroup: str = 'outgroup',
+        dpdebug=0,
         out_file=None,
         out_basefile=None,
         noimprovement_stop=0,
@@ -1212,7 +1316,7 @@ def count_wgd_nodes(
             # exclude present
             current_wgdnodes = list(set(st.root.nodes()).difference([wgd]))            
 
-            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, current_wgdnodes, excludedoutgroup=outgroup)   
+            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, current_wgdnodes, excludedoutgroup=outgroup, dpdebug=dpdebug)   
 
             if is_feasible:
                 print (f"Node {wgd.num} is not fixed episode. EC={len(used_wgd_nodes)}")
@@ -1229,8 +1333,8 @@ def count_wgd_nodes(
     maxec = len(st.root.nodes()) 
     potential_wgd_nodes = list(set(st.root.nodes()) - fixed_wgd_nodes)
     samplingsets = False
-    
-    if wgddebug:                
+
+    if dpdebug > 0:
         print(gt)
         print(st.root.markrepr(fixed_wgd_nodes))
 
@@ -1298,7 +1402,7 @@ def count_wgd_nodes(
         if verbose:
             print(f"[{setid}] Computing gene-species distribution maps")
 
-        _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
+        _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup, dpdebug=dpdebug)
 
         if dpdistr is None:
             reporterror(out_file, "No distribution map (dpdistr is None)", outstats)
@@ -1330,7 +1434,7 @@ def count_wgd_nodes(
 
             if verbose == 2:
                 print(f"DP start with WGD={wgdnums(wgd_node_set)}", end="...")                       
-            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)   
+            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup, dpdebug=dpdebug)   
 
             if is_feasible:
                 gt_inferred_str = gt_inferred_str_cur                    
