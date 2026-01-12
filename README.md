@@ -189,6 +189,49 @@ python3 metaec.py \
 cat results/embedding
 ```
 
+### Locked Episode Support Analysis
+
+Identify which network nodes are required (locked) for reconciling each individual gene tree:
+
+```bash
+mkdir -p results
+python3 metaec.py \
+    --gene_trees data_sim/wgd-1-gene-trees \
+    --network data_sim/s_tree \
+    --locked_epi_support \
+    --out_file results/output.txt
+```
+
+This generates two output files:
+
+**File: `results/outputlocked_epi`** - Lists locked episode node numbers for each gene tree (one line per gene tree):
+```
+10
+10
+9 4 10 3
+10
+10 3
+```
+
+**File: `results/outputlocked_epi_net`** - The species network annotated with support counts:
+```
+((((A[num=3;lockedepisupport=2],
+    B[num=4;lockedepisupport=1])[num=2],
+   (C[num=6],D[num=7])[num=5])[num=1],
+  o[num=9;lockedepisupport=1])[],
+ o[num=9;lockedepisupport=1])[num=10;lockedepisupport=5]
+```
+
+**Interpretation:**
+- `lockedepisupport=5` means 5 gene trees require a WGD at that node
+- Nodes with high support are strong candidates for WGD events
+- Each line in `locked_epi` shows which nodes are mandatory for that specific gene tree
+
+**Example Use Cases:**
+- Identify consensus WGD locations across gene trees
+- Find outlier gene trees with unusual duplication patterns
+- Understand which gene trees impose strict constraints on WGD placement
+
 ### Distribution Maps
 
 Add distribution maps to the output:
@@ -231,14 +274,14 @@ python3 metaec.py \
 
 ### GSE-Style Output
 
-Use GSE (Gene tree Species tree Embedding) format for output attributes:
+Use GSE format for output attributes:
 
 ```bash
 python3 metaec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --out_file results
-    --gsestyle
+    --gse
 ```
 
 ## Complete Example Workflow
