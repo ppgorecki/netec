@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 import os
 import sys
-from metatreeop import count_wgd_nodes, is_reconciled_using_wgd_withcounts, is_reconciled_using_wgd
+from algorithms import count_wgd_nodes, is_reconciled_using_wgd_withcounts, is_reconciled_using_wgd
 from treeop import Tree,str2tree
-from rec import ecfeasbible, metaecfeasible
+from rec import ecfeasbible, netecfeasible
 
 
 def compd(d1, d2, slf):
@@ -68,7 +68,7 @@ Naive vs DP tester
             episodes = [ st.nodes[i] for i in epinums ]
 
         #print (",".join(str(e.num)+str(e) for e in episodes))        
-        naive, distrcnt, leafmap = metaecfeasible(gt, st, episodes, leafdistr = True)        
+        naive, distrcnt, leafmap = netecfeasible(gt, st, episodes, leafdistr = True)        
         dp, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, episodes,  wgddebug=wgddebug)        
 
         if naive!=dp: #or dp!=dp2:

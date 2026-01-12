@@ -2,7 +2,7 @@ import os
 
 from fixedec import fixedec
 from treeop import str2tree, Tree
-from metatreeop import add_outgroup, combine_gene_trees
+from algorithms import add_outgroup, combine_gene_trees
 
 
 def main():

@@ -2,7 +2,7 @@
 
 import argparse
 
-from metatreeop import count_wgd_nodes_combined
+from algorithms import count_wgd_nodes_combined
 from treeop import str2tree, Tree
 from netop import Network
 import time
@@ -17,7 +17,7 @@ sys.setrecursionlimit(3000)
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run WGD reconciliation algorithm for input network/tree and gene trees with ?")
+        description="Run WGD reconciliation algorithm for input network/tree and gene trees")
     
     parser.add_argument("--gene_trees", help="Path to a file with newline separated gene trees", type=str, default=None)
     
@@ -49,6 +49,8 @@ def main():
     parser.add_argument("--distr_counts", help="Do not normalize distr maps", action='store_true')
 
     parser.add_argument("--gsestyle", help="Use gse output for attributes, reticulations ids without #; default is newick", action='store_true')
+
+    parser.add_argument("--wgddebug", help="Print all tabs from DP programming run (debug)", action='store_true')
 
     parser.add_argument("--user_episodes", help="User defined list episodes; a list of node identifiers, e.g., '2 4 10' or use 'all' for all)", type=str, default='')    
 
@@ -154,7 +156,7 @@ def main():
     if out_file:
         if os.path.isdir(out_file):            
             out_dir = out_file
-            out_file = out_dir + os.path.sep + "metaec.log" # default
+            out_file = out_dir + os.path.sep + "netec.log" # default
             out_basefile = out_dir + os.path.sep 
         else:
             if len(out_file)>5 and out_file[-3]=='.':
@@ -167,7 +169,7 @@ def main():
             net, locked_epi = count_wgd_nodes_combined(
                 network, 
                 [gt], 
-                wgddebug = False,             
+                wgddebug = args.wgddebug,             
                 out_file = None,
                 out_basefile = out_basefile,
                 noimprovement_stop = args.noimprovement_stop,
@@ -213,7 +215,7 @@ def main():
     cost, used_nodes, exactsolution, outstats = count_wgd_nodes_combined(
             network, 
             gene_trees, 
-            wgddebug = False,             
+            wgddebug = args.wgddebug,             
             out_file = out_file,
             out_basefile = out_basefile,
             noimprovement_stop = args.noimprovement_stop,

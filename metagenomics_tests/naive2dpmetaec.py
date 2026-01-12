@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 import os
 import sys
-from metatreeop import count_wgd_nodes, is_reconciled_using_wgd_withcounts, is_reconciled_using_wgd
+from algorithms import count_wgd_nodes, is_reconciled_using_wgd_withcounts, is_reconciled_using_wgd
 from treeop import Tree,str2tree
-from rec import ecfeasbible, metaecfeasible
+from rec import ecfeasbible, netecfeasible
 
 
 
@@ -45,10 +45,10 @@ Naive vs DP tester
         print (",".join(str(e.num) for e in episodes))
 
         if leafdistr:
-            naive, distrcnt, leafmap = metaecfeasible(gt, st, episodes, leafdistr = leafdistr)
+            naive, distrcnt, leafmap = netecfeasible(gt, st, episodes, leafdistr = leafdistr)
             print(leafmap)
         else: 
-            naive, _, _ = metaecfeasible(gt, st, episodes)
+            naive, _, _ = netecfeasible(gt, st, episodes)
 
         dp = is_reconciled_using_wgd_withcounts(st, gt, episodes)
         dp2,_,_ = is_reconciled_using_wgd(st, gt, episodes)

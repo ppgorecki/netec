@@ -3,7 +3,7 @@
 import argparse
 from random import randint
 
-from metatreeop import count_wgd_nodes_combined
+from algorithms import count_wgd_nodes_combined
 from treeop import str2tree, randtreestr, Tree
 
 

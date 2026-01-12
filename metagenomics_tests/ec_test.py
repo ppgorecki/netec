@@ -2,7 +2,7 @@ import random
 from random import randint
 
 from fixedec import fixedec
-from metatreeop import combine_gene_trees, add_outgroup, is_reconciled_using_wgd
+from algorithms import combine_gene_trees, add_outgroup, is_reconciled_using_wgd
 from rec import rec
 from treeop import str2tree, randtreestr, Tree
 
