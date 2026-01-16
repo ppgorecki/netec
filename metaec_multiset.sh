@@ -113,8 +113,8 @@ function singledataset()
 			fi
 		fi
 
-	#echo "python3 metaec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile --distribution_maps $CONT $REVERSE_CLIMB"
-	python3 metaec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile --distribution_maps $CONT $REVERSE_CLIMB
+	#echo "python3 netec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile --distribution_maps $CONT $REVERSE_CLIMB"
+	python3 netec.py --randomize_from $RANDOMIZE_FROM --noimprovement_stop $NOIMPROVEMENT_STOP --gene_trees $GENETREES --species_tree $SPECIESTREE --out_file=$outfile --distribution_maps $CONT $REVERSE_CLIMB
 	
 	echo $GENETREES completed 
 	

@@ -163,7 +163,7 @@ def ecfeasbible(gt, st, episodes) -> bool:
 
     return False
 
-def metaecfeasible(gt, st, episodes, leafdistr=False) -> (bool, int, dict):
+def netecfeasible(gt, st, episodes, leafdistr=False) -> (bool, int, dict):
     """
     Given a partial gene tree and a species tree 
     check if there is a gene tree gt' that extends gt 
@@ -212,7 +212,7 @@ def metaecfeasible(gt, st, episodes, leafdistr=False) -> (bool, int, dict):
     return False, 0, {}
 
 
-def metaecfeasibleleafmap(gt, st, episodes) -> bool:
+def netecfeasibleleafmap(gt, st, episodes) -> bool:
     """
     Given a partial gene tree and a species tree 
     check if there is a gene tree gt' that extends gt 

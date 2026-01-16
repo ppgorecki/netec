@@ -40,7 +40,7 @@ A text file with one gene tree per line in Newick format. Gene labels should mat
 ### Minimal Example
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree
 ```
@@ -55,7 +55,7 @@ This shows that 1 duplication episode explains all gene tree duplications.
 
 ```bash
 mkdir -p results
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --out_file results/output.log
@@ -65,7 +65,7 @@ python3 metaec.py \
 
 ```bash
 mkdir -p results
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --out_file results
@@ -74,7 +74,7 @@ python3 metaec.py \
 ### With Verbose Output
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --verbose 2
@@ -86,7 +86,7 @@ Use `--verbose 2` to print the WGD nodes used in the solution.
 
 ```bash
 mkdir -p results
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_yeast/gtrees \
     --network data_yeast/s_tree \
     --out_file results
@@ -105,7 +105,7 @@ echo "((a,a),(b,c))" > gtrees.txt
 echo "((a,b),(c,c))" >> gtrees.txt
 
 # Run analysis
-python3 metaec.py \
+python3 netec.py \
     --gene_trees gtrees.txt \
     --network network.txt
 ```
@@ -117,7 +117,7 @@ python3 metaec.py \
 Filter out gene trees with fewer than N duplications:
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --mindup 2
@@ -128,7 +128,7 @@ Note: `--mindup` only works for trees (networks without reticulations).
 ### View Duplication Statistics
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --print_dup_stats
@@ -149,13 +149,13 @@ Specify which nodes to consider as potential duplication episodes:
 
 ```bash
 # Consider specific nodes (by node numbers)
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --user_episodes "2 4 10"
 
 # Consider all nodes
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --user_episodes all
@@ -167,7 +167,7 @@ Generate a species tree/network with episode size attributes:
 
 ```bash
 mkdir -p results
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --out_file results \
@@ -181,7 +181,7 @@ Save the inferred gene-species mapping:
 
 ```bash
 mkdir -p results
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --out_file results \
@@ -195,35 +195,32 @@ Identify which network nodes are required (locked) for reconciling each individu
 
 ```bash
 mkdir -p results
-python3 metaec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+python3 netec.py \
+    --gene_trees example_locked_epi/gene_trees  \
+    --network example_locked_epi/species_tree  \
     --locked_epi_support \
-    --out_file results/output.txt
+    --out_file results
 ```
 
 This generates two output files:
 
-**File: `results/outputlocked_epi`** - Lists locked episode node numbers for each gene tree (one line per gene tree):
+**File: `results/locked_epi`** - Lists locked episode node numbers for each gene tree (one line per gene tree):
 ```
-10
-10
-9 4 10 3
-10
-10 3
+2
+5
+3 2
+
+2
+0
 ```
 
-**File: `results/outputlocked_epi_net`** - The species network annotated with support counts:
+**File: `results/locked_epi_net.newick`** - The species network annotated with support counts:
 ```
-((((A[num=3;lockedepisupport=2],
-    B[num=4;lockedepisupport=1])[num=2],
-   (C[num=6],D[num=7])[num=5])[num=1],
-  o[num=9;lockedepisupport=1])[],
- o[num=9;lockedepisupport=1])[num=10;lockedepisupport=5]
+((A[num=2;lockedepisupport=3],B[num=3;lockedepisupport=1])[num=1],(C[num=5;lockedepisupport=1],D[num=6])[num=4])[num=0;lockedepisupport=1]
 ```
 
 **Interpretation:**
-- `lockedepisupport=5` means 5 gene trees require a WGD at that node
+- `lockedepisupport=3` means 3 gene trees require a WGD at that node
 - Nodes with high support are strong candidates for WGD events
 - Each line in `locked_epi` shows which nodes are mandatory for that specific gene tree
 
@@ -231,13 +228,14 @@ This generates two output files:
 - Identify consensus WGD locations across gene trees
 - Find outlier gene trees with unusual duplication patterns
 - Understand which gene trees impose strict constraints on WGD placement
+- Low lockedepisupport may suggest removal gene trees that induce support at that node
 
 ### Distribution Maps
 
 Add distribution maps to the output:
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --distribution_maps \
@@ -251,7 +249,7 @@ Note: use with species trees only (no reticulations in networks).
 For large datasets, use randomization to speed up computation:
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --randomize_from 1000 \
@@ -266,7 +264,7 @@ python3 metaec.py \
 Alternative search strategy starting from fixed WGD and expanding:
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --reversed_climb
@@ -277,11 +275,11 @@ python3 metaec.py \
 Use GSE format for output attributes:
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --out_file results
-    --gse
+    --gsestyle
 ```
 
 ## Complete Example Workflow
@@ -291,7 +289,7 @@ python3 metaec.py \
 mkdir -p results/sim results/yeast
 
 # 1. Analyze gene trees from simulation data
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --out_file results/sim \
@@ -299,7 +297,7 @@ python3 metaec.py \
     --verbose 1
 
 # 2. Analyze with episode summary output
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_yeast/gtrees \
     --network data_yeast/s_tree \
     --out_file results/yeast/ \
@@ -308,7 +306,7 @@ python3 metaec.py \
 
 # 3. Filtering of low-duplication trees (for non-reticulation networks)
 for mindup in 1 2 3 4; do
-python3 metaec.py \
+python3 netec.py \
     --gene_trees data_sim/wgd-1-gene-trees \
     --network data_sim/s_tree \
     --mindup $mindup \
@@ -321,7 +319,7 @@ done
 
 When using `--out_file`, the following files may be generated:
 
-- `<out_file>` or `<out_dir>/metaec.log` - Main log with parameters and results
+- `<out_file>` or `<out_dir>/netec.log` - Main log with parameters and results
 - `<out_basefile>.embedding` - Gene-species embedding (with `--save_embedding`)
 - `<out_basefile>episummary` - Species tree with episode attributes (with `--episummaryfile`)
 
@@ -335,7 +333,7 @@ Example shell script pattern:
 for file in data_sim/wgd-1-gene-trees_*; do
 	DIR="results/$(basename $file)"
 	mkdir -p $DIR
-    python3 metaec.py \
+    python3 netec.py \
         --gene_trees "$file" \
         --network data_sim/s_tree \
         --out_file $DIR
@@ -373,7 +371,7 @@ cut -f1 fu.txt > st.txt
 **2. View duplication statistics:**
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --network st.txt \
     --gene_trees gt.txt \
     --print_dup_stats
@@ -382,7 +380,7 @@ python3 metaec.py \
 **3. Run episode analysis with filtered trees:**
 
 ```bash
-python3 metaec.py \
+python3 netec.py \
     --network st.txt \
     --gene_trees gt.txt \
     --mindup 4

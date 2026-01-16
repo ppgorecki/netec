@@ -81,8 +81,18 @@ class Network(Tree):
 
         self.setnodes(outgroup=outgroup)
 
+        # set outgroup data
+        self.outgroup = outgroup
+        if len(self.root.c)>1 and self.root.c[1].clusterleaf == outgroup:
+            self.trueroot = self.root.c[0]            
+        else:
+            self.trueroot = self.root            
+
         for n in self.nodes:
-            n._setcluster()  # reconstruct clusters
+            n._setcluster()  # reconstruct clusters    
+
+    def outgrouped(self):
+        return self.outgroup
 
     def isdag(self):
         return sorttop([(n.num, c.num) for n in self.nodes for c in n.c])

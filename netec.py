@@ -66,6 +66,8 @@ def main():
 
     args = parser.parse_args()
 
+    outstyleext = ".gse" if args.gsestyle else ".newick"
+
 
     user_episodes = []
     if args.user_episodes:
@@ -206,8 +208,8 @@ def main():
             if n.num in d:
                 n.lockedepisupport = d[n.num]
 
-        with open(out_basefile+"locked_epi_net",'w') as f:
-            f.write(net.root.attrrepr(['num','lockedepisupport'], gsestyle=args.gsestyle))
+        with open(out_basefile+"locked_epi_net" + outstyleext,'w') as f:
+            f.write(net.trueroot.attrrepr(['num','lockedepisupport'], ignorezeros=False, gsestyle=args.gsestyle))
                 
         return
 
@@ -252,7 +254,7 @@ def main():
     if args.episummaryfile:
         pos = outstats.find('outspeciestree_wo')
         if pos>=0:            
-            with open(out_basefile+"episummary","w") as f:
+            with open(out_basefile + "episummary" + outstyleext,"w") as f:
                 f.write(outstats[pos:].split('\n')[0][19:-1])
         
     if args.verbose:

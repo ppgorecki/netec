@@ -1,9 +1,9 @@
 
-# Tester for network based metaec
+# Tester for network based netec
 
 RETICULATIONS=2
 N=5
-DESTDIR=metaecnettest
+DESTDIR=netecnettest
 GTREES=5
 
 mkdir -p $DESTDIR
@@ -16,5 +16,5 @@ do
 	src/embnet.py -g rand:$K:0 -pg 
 done | sed "s/[fghi]/?/g" > $DESTDIR/gtrees.txt
 
-./metaec.py --gene_trees $DESTDIR/gtrees.txt --network $DESTDIR/net.txt --out_file $DESTDIR/metaec.log
+./netec.py --gene_trees $DESTDIR/gtrees.txt --network $DESTDIR/net.txt --out_file $DESTDIR/netec.log
 

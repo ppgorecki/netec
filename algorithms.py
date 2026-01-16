@@ -81,7 +81,7 @@ def pptabs3(st, gt, de, dd, si, deu, ddu, siu):
     def ppu(u):
         return "{"+" ".join(str(v.num) for v in u)+"}"
 
-    print(f"   {'SN':20}    {'GN':20} De Dd Si Ep | deu ddu siu")
+    print(f"   {'SN':20}    {'GN':1}0 De Dd Si Ep | deu ddu siu")
     for g, s in itertools.product(gt.nodes, st.nodes):
         print(
             f"{s.num:2} {ppn(s):15} {g.num:2} {ppn(g):15} {logic3str(de.get((s, g), '-'))}  {logic3str(dd.get((s, g), '-'))}  {logic3str(si.get((s, g), '-'))}  {eps(s, g)}  | {ppu(deu[s,g])} {ppu(ddu[s,g])} {ppu(siu[s,g])}")
@@ -261,13 +261,9 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
         delta(s,g)    
 
     is_valid, node_usage, leafmap = delta_down(st.root, gt.root)
-
-    #wgddebug=True
+    
     if wgddebug:
-        pptabs3(st, gt, deltav, deltadownv, sigmav, delta_usage, deltadown_usage, sigma_usage)
-        # pptabs("d ",deltav,delta_usage)
-        # pptabs("dd",deltadownv,deltadown_usage)
-        # pptabs("si",sigmav,sigma_usage)
+        pptabs3(st, gt, deltav, deltadownv, sigmav, delta_usage, deltadown_usage, sigma_usage)        
 
     if is_valid is True:             
         return is_valid, node_usage, gt.nodemaprepr(dict(leafmap))
@@ -916,8 +912,7 @@ def combine_gene_trees(gtrees: List[Tree], outgroup: str = "outgroup") -> Tree:
 Add outgroup to a tree or a network
 """
 def add_outgroup(network: Network, outgroup: str) -> Tree:    
-    return network.__class__(str2tree(f"({str(network)},{outgroup})"),outgroup=outgroup)
-
+    return network.__class__(str2tree(f"({str(network)},{outgroup})"), outgroup=outgroup)
 
 """
 Fill missing leaves using random labels
@@ -1149,8 +1144,6 @@ def count_wgd_nodes(
 
     #upper_bound = opttrees_gdscore(st, gt) if count_upper_bound else len(st.nodes) - 1
     
-    outgrouped = st.root.c[1].clusterleaf == outgroup
-
     speciestreeonly = not st.reticulations
 
     # ugly, for reporting only
@@ -1249,9 +1242,9 @@ def count_wgd_nodes(
     outstats+=f"reversed_climb={reversed_climb}\n"
     outstats+=f"unknownlabels={unklabs}\n"
 
-    if outgrouped:
+    if st.outgrouped():
         gts_split = split_outgrouped_tree(gt, outgroup)
-        stroot = strootnooutgroup = st.root.c[0]
+        stroot = strootnooutgroup = st.trueroot
         eccorrection = 1 if len(gts_split)>1 else 0 # additional dupliaction if two trees are present
 
         outstats+=f"#with no outgroup (wo)\n"
@@ -1286,12 +1279,12 @@ def count_wgd_nodes(
     if not unklabs:
         exactsolution = True
 
-    def reporterror(out_file, info, outstats):            
-        f = open("metaec.err.log","a")
+    def reporterror(out_file, info, outstats):
+        f = open("netec.err.log","a")
         f.write(f"\n========={out_file}============\n")
-        f.write(outstats)        
+        f.write(outstats)
         f.close()
-        raise Exception(f"[{out_file}] {info}. See metaec.err.log for details")
+        raise Exception(f"[{out_file}] {info}. See netec.err.log for details")
 
     def getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup):
 
@@ -1489,7 +1482,7 @@ def count_wgd_nodes(
     outstats+=f"exactsolution={exactsolution}\n"
     outstats+=f"unknownlabels={unklabs}\n"
 
-    if outgrouped:
+    if st.outgrouped():
 
         gt_wo = split_outgrouped_tree(Tree(str2tree(gt_inferred_str)), outgroup)        
         st_wo = Network(str2tree(stroot.netrepr()))        
@@ -1535,12 +1528,12 @@ def count_wgd_nodes(
 
         outstats+=f"outgenetrees_wo=\"{gt_inferred_str_wo}\"\n"        
         outstats+=f"bestcost_wo={best_cost-eccorrection}\n"
-        outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
+        outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr, gsestyle=gsestyle)}\"\n"
         outstats+=f"outspeciestree_worec=\"{st_wo.root.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
 
 
     else:
         if distribution_maps:        
-            outstats+=getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
+            outstats += getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
     
     return best_cost, best_wgd_nodes, exactsolution, outstats
