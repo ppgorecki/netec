@@ -601,7 +601,7 @@ def quasiconsensusgen(gtrees, qtreescnt):
         gtrees: a collection of gene trees
         qtreescnt: how many quasi-consensus tree to generate
     """
-
+    
     d = {}
     alllabels = set()
     for g in gtrees:

@@ -2,7 +2,7 @@
 
 import argparse
 
-from algorithms import count_wgd_nodes_combined
+from algorithms import count_wgd_nodes_combined, epiattr, wgdnums
 from treeop import str2tree, Tree
 from netop import Network
 import time
@@ -27,7 +27,7 @@ def main():
     
     parser.add_argument("--initial_gene_tree", help="Path to a file with the initial gene tree (already precomputed)", type=str, default=None)
     
-    parser.add_argument("--out_file", help="Path to an output file or directory with results", type=str, default="")
+    parser.add_argument("--out_dir", help="Path to directory with results; default results", type=str, default="")
     
     parser.add_argument("--randomize_from", help="Start randomizing from a given size of binom(n,k) in the main loop", type=int, default=0)
     
@@ -40,9 +40,7 @@ def main():
 
     parser.add_argument("--print_distr_maps", help="Print the output tree with distribution maps (networks not implemented yet)", action='store_true')
 
-    parser.add_argument("--save_embedding", help="Save inferred embedding to [outfile].embedding", action='store_true')
-
-    parser.add_argument("--episummaryfile", help="Save the species/network with the episize attributes", action="store_true")
+    parser.add_argument("--save_embedding", help="Save inferred embedding to [outfile].embedding", action='store_true')    
 
     parser.add_argument("--verbose", help="0 - none, 1 - basic, 2 - print wgd nodes", type=int, default=1)
 
@@ -52,13 +50,15 @@ def main():
 
     parser.add_argument("--wgddebug", help="Print all tabs from DP programming run (debug)", action='store_true')
 
-    parser.add_argument("--user_episodes", help="User defined list episodes; a list of node identifiers, e.g., '2 4 10' or use 'all' for all)", type=str, default='')    
+    parser.add_argument("--user_episodes", help="User defined list episodes as a list of node identifiers, e.g., '2 4 10', 'all' for all, or a file name); the computations are done only for the given set", type=str, default='')    
 
-    parser.add_argument("--fixed_episodes_ext", help="User defined list of fixed episodes; use if episodes are known to be used in order to optimize computations", type=str, default='')    
 
-    parser.add_argument("--no_fixed_episodes_search", help="Skip fixed episode search using DP (def. False)",   action='store_true')
+    parser.add_argument("--fixed_episodes", help="List of precomputed fixed episodes; use if episodes are known to optimize computations with --fixed_episodes_search False ", type=str, default='')    
+    parser.add_argument("--fixed_episodes_search", help="Infer fixed episodes using tree/net structure and DP (def. True)", type=bool, default=True)
 
-    parser.add_argument("--locked_epi_support", help="For every gene tree and every net node identify locked episodes",  action='store_true')
+    parser.add_argument("--extended_episodes_search", help="Identify non-fixed episodes with large number of duplications; saved as eeepisize attribute", action='store_true')    
+
+    parser.add_argument("--locked_epi_support", help="For every gene tree and every net node identify locked episodes; saved as lockedepisupport attribute",  action='store_true')
 
     parser.add_argument("--mindup", help="Filter gene trees with duplication count < MINDUP (only for networks with no reticulations, i.e., trees; ignored for networks); default is 0", type=int, default=0)
 
@@ -68,27 +68,30 @@ def main():
 
     outstyleext = ".gse" if args.gsestyle else ".newick"
 
+    def is_existing_file(filepath: str) -> bool:
+        return os.path.exists(filepath) and os.path.isfile(filepath)
 
-    user_episodes = []
-    if args.user_episodes:
-        if args.user_episodes == 'all':
-            user_episodes = 'all'
-        else:
-            try:
-                user_episodes = list(map(int,args.user_episodes.split()))
-            except:
-                print("Incorrect format of user episodes. Example '2 4 10' or all", file=sys.stderr)
-                sys.exit(-1)
+    def parse_episodes(f, name):
+        if not f: 
+            return []
 
-    fixed_episodes_ext = []
-    if args.fixed_episodes_ext:
+        if f == 'all':
+            return f
+            
         try:
-            fixed_episodes_ext = list(map(int,args.fixed_episodes_ext.split()))
-        except:
-            print("Incorrect format of fixed episodes. Example '2 4 10'", file=sys.stderr)
-            args.print_help()
+            if is_existing_file(f):
+                f = open(f).read()
+
+            return list(map(int, f.split()))
+
+        except:                        
+            print(f"Incorrect format for {name}. Example '2 4 10', all or a filename", file=sys.stderr)
             sys.exit(-1)
 
+    
+    user_episodes = parse_episodes(args.user_episodes, "user_episodes")
+    fixed_episodes = parse_episodes(args.fixed_episodes,"fixed_episodes")
+        
     if not args.gene_trees:
         print("Gene trees not specified", file=sys.stderr)
         parser.print_help()
@@ -151,20 +154,23 @@ def main():
     if args.reference_trees:
         with open(args.reference_trees) as f:
             reference_trees = [ Tree(str2tree(g_str)) for g_str in f.read().split() ]
+    
+    out_dir = args.out_dir if args.out_dir else "results" 
 
-    out_file = args.out_file          
-    out_basefile="" 
-    out_dir = "."+os.path.sep
-    if out_file:
-        if os.path.isdir(out_file):            
-            out_dir = out_file
-            out_file = out_dir + os.path.sep + "netec.log" # default
-            out_basefile = out_dir + os.path.sep 
-        else:
-            if len(out_file)>5 and out_file[-3]=='.':
-                out_basefile = out_file[:-3]      
+    if os.path.isfile(out_dir):
+        print(f"Error: '{out_dir}' is a file, not a directory", file=sys.stderr)
+        return 1
+
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+
+    out_file = out_dir + os.path.sep + "netec.log" # default
+    out_basefile = out_dir + os.path.sep 
 
     if args.locked_epi_support:        
+
+        if args.verbose>=0:
+            print("Computing locked episode support")
 
         locked_episodes = []
         for gt in gene_trees:
@@ -180,41 +186,32 @@ def main():
                 reversed_climb = args.reversed_climb,
                 initial_gene_tree = initial_gene_tree,
                 distribution_maps = args.distribution_maps,
-                reference_trees = reference_trees,
-                distribution_maps_epi = args.distribution_maps_epi,
-                print_distr_maps = args.print_distr_maps,
-                save_embedding = args.save_embedding,
+                reference_trees = None,
+                distribution_maps_epi = False,
+                print_distr_maps = False,
+                save_embedding = False,
                 outgroup="o",
-                verbose=args.verbose,
-                distr_counts=args.distr_counts,
+                verbose=args.verbose-1, # decrease
+                distr_counts=False,
                 gsestyle=args.gsestyle,
                 user_episodes = user_episodes,
-                fixed_episodes_ext = fixed_episodes_ext,
-                find_fixed_episodes = not args.no_fixed_episodes_search,
-                locked_epi_support = args.locked_epi_support
+                fixed_episodes = fixed_episodes,
+                fixed_episodes_search = True,
+                locked_epi_support = True
             )
             locked_episodes.append(locked_epi)            
 
-        d = {}
+        locked_epi_support = {}
+        
         with open(out_basefile+"locked_epi",'w') as f:
             for i in locked_episodes:
                 f.write(" ".join(str(e.num) for e in i)+"\n")
 
                 for e in i:
-                    if e.num not in d: d[e.num]=0
-                    d[e.num]+=1
+                    if e.num not in locked_epi_support: locked_epi_support[e.num]=1
+                    else: locked_epi_support[e.num]+=1                
 
-        for n in net.nodes:
-            if n.num in d:
-                n.lockedepisupport = d[n.num]
-
-        with open(out_basefile+"locked_epi_net" + outstyleext,'w') as f:
-            f.write(net.trueroot.attrrepr(['num','lockedepisupport'], ignorezeros=False, gsestyle=args.gsestyle))
-                
-        return
-
-
-    cost, used_nodes, exactsolution, outstats = count_wgd_nodes_combined(
+    cost, used_nodes, exactsolution, outstats, stroot, fixed_episodes = count_wgd_nodes_combined(
             network, 
             gene_trees, 
             wgddebug = args.wgddebug,             
@@ -235,32 +232,45 @@ def main():
             distr_counts=args.distr_counts,
             gsestyle=args.gsestyle,
             user_episodes = user_episodes,
-            fixed_episodes_ext = fixed_episodes_ext,
-            find_fixed_episodes = not args.no_fixed_episodes_search            
+            fixed_episodes = fixed_episodes,
+            fixed_episodes_search = args.fixed_episodes_search,
+            extended_episodes_search = args.extended_episodes_search            
             )
+
+
 
     endtime = time.process_time() - t
      
-    if out_file:
-        with open(out_file,"w") as f:
-            f.write(f"gene_trees_file={args.gene_trees}\n")        
-            f.write(f"network_file={args.network}\n")                
-            f.write(f"{outstats}")
-            f.write(f"randomize_from={args.randomize_from}\n")
-            f.write(f"noimprovement_stop={args.noimprovement_stop}\n")
-            f.write(f"time={endtime}")
+    with open(out_file, "w") as f:
+        f.write(f"gene_trees_file={args.gene_trees}\n")        
+        f.write(f"network_file={args.network}\n")                
+        f.write(f"{outstats}")
+        f.write(f"randomize_from={args.randomize_from}\n")
+        f.write(f"noimprovement_stop={args.noimprovement_stop}\n")
+        f.write(f"time={endtime}")
 
-    # Write output network (gse)
-    if args.episummaryfile:
-        pos = outstats.find('outspeciestree_wo')
-        if pos>=0:            
-            with open(out_basefile + "episummary" + outstyleext,"w") as f:
-                f.write(outstats[pos:].split('\n')[0][19:-1])
-        
+    if args.locked_epi_support:
+        for nnum, v in locked_epi_support.items():
+            for n in stroot.nodes():
+                if n.num == nnum:
+                    n.lockedepisupport = v
+
+    # Write output network (gse) and fixedwgd's    
+    with open(out_basefile + "episummary" + outstyleext,"w") as f:
+        f.write(stroot.attrrepr(epiattr, ignorezeros=False, gsestyle=args.gsestyle))
+        if args.verbose>=2:
+            print(f"Network with attributes saved in {out_basefile}episummary{outstyleext}")
+
+    if fixed_episodes: 
+        with open(out_basefile + "fixed_episodes","w") as f:
+            f.write(wgdnums(fixed_episodes,'',''))
+        if args.verbose>=2:                
+            print("Fixed episodes stored in fixed_episodes file")
+    
     if args.verbose:
         print(f"[{setid}] Cost: {cost} Exact:{exactsolution}")
 
-    if args.verbose==2:
+    if args.verbose>2:
         print("Used nodes: ")
         for node in used_nodes:
             print(node)

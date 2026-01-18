@@ -189,13 +189,26 @@ python3 netec.py \
 cat results/embedding
 ```
 
+### Extended Episode Analysis
+
+Identify non-fixed episode nodes that are good candidate to be episode.
+
+```bash
+python3 netec.py \  
+    --gene_trees example_extended_episodes/gene_trees  \
+    --network example_extended_episodes/network  \    
+    --extended_episodes_search
+```
+
+Note that some the candidatte episode combinations have no feasible solution. Such a sitution is rare in practise.
+
 ### Locked Episode Support Analysis
 
 Identify which network nodes are required (locked) for reconciling each individual gene tree:
 
 ```bash
 mkdir -p results
-python3 netec.py \
+python3 netec.py \  
     --gene_trees example_locked_epi/gene_trees  \
     --network example_locked_epi/species_tree  \
     --locked_epi_support \

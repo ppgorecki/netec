@@ -13,8 +13,10 @@ import statistics
 
 Unknown = None
 
-def wgdnums(wgds):
-    return "{"+" ".join( str(w.num) for w in sorted(wgds,key=lambda k: k.num))+"}"
+epiattr = ['episize', 'epigtcount', 'epibestwgd', 'num', 'lfmapcnt', 'lfmapcnt_none', 'lfmapcv', 'lfmapcv_none','distrsum', 'eeepisize', 'lockedepisupport'] 
+
+def wgdnums(wgds, br1="{", br2="}"):
+    return br1+" ".join( str(w.num) for w in sorted(wgds,key=lambda k: k.num))+br2
 
 def conjuction(a, b):
     if a is False or b is False: return False
@@ -949,8 +951,9 @@ def count_wgd_nodes_combined(
         distr_counts = False,
         gsestyle = False,
         user_episodes = None,
-        fixed_episodes_ext = None,
-        find_fixed_episodes = True,
+        fixed_episodes = None,
+        fixed_episodes_search = True,
+        extended_episodes_search = False,
         locked_epi_support = False
         ) -> Tuple[float, Set[Node]]:
     """ 
@@ -995,9 +998,10 @@ def count_wgd_nodes_combined(
         distr_counts=distr_counts,
         gsestyle = gsestyle,
         user_episodes = user_episodes,
-        fixed_episodes_ext = fixed_episodes_ext,
+        fixed_episodes = fixed_episodes,
         locked_epi_support = locked_epi_support,
-        find_fixed_episodes = find_fixed_episodes)
+        extended_episodes_search = extended_episodes_search,
+        fixed_episodes_search = fixed_episodes_search)
 
 def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
 
@@ -1129,8 +1133,9 @@ def count_wgd_nodes(
         distr_counts = False,
         gsestyle = False,
         user_episodes = None,
-        fixed_episodes_ext = None,
-        find_fixed_episodes = True,
+        fixed_episodes = None,
+        fixed_episodes_search = True,
+        extended_episodes_search = False,
         locked_epi_support = False,
         ) -> Tuple[float, Set[Node]]:
     """ 
@@ -1152,8 +1157,6 @@ def count_wgd_nodes(
     else:
         speciestreelab = "speciestree"
 
-    epiattr = ['episize', 'epigtcount', 'epibestwgd', 'num', 'lfmapcnt', 'lfmapcnt_none', 'lfmapcv', 'lfmapcv_none','distrsum' ] 
-
     # root.c[0] - skip outgroup    
     if initial_gene_tree:
         # initialize using initial gene tree
@@ -1173,13 +1176,22 @@ def count_wgd_nodes(
     else:        
         fixed_wgd_nodes = fixedecnet(gt, st)           
 
+    for n in st.nodes:
+        if hasattr(n, 'episize'):      
+            delattr(n, 'episize') # clean            
+
 
     def convertnums(l):
         return (v for v in st.nodes if v.num in l )        
 
-    if fixed_episodes_ext:
-        for v in convertnums(fixed_episodes_ext):
+    clean_fixed_episodes = True # True if inferred from fixedec* and find_fixed_episodes
+
+    if fixed_episodes:
+        clean_fixed_episodes = False
+        for v in convertnums(fixed_episodes):
             fixed_wgd_nodes.add(v) 
+        if verbose>=2: 
+            print(f"Inserted predefined fixed_episodes: {wgdnums(fixed_wgd_nodes)}")
         
     user_wgd_episodes = set()
     if user_episodes:        
@@ -1190,32 +1202,73 @@ def count_wgd_nodes(
             print("User episode:",v.num, v)
             user_wgd_episodes.add(v)                
     
-    if fixed_wgd_nodes:
-        print("Fixed episodes:", wgdnums(fixed_wgd_nodes))
-
+    fwgdcnt = len(fixed_wgd_nodes)
+    
     # Identify more fixed episodes based on the current best_wgd_nodes
 
-    if find_fixed_episodes and len(fixed_wgd_nodes)!=len(st.nodes):
-        if verbose == 2:    
-            print("Locating additional fixed episodes among", wgdnums(best_wgd_nodes))
+    if fixed_episodes_search:
+        cands = set(best_wgd_nodes).difference(fixed_wgd_nodes)
+        if verbose >=1:    
+            print("Locating additional fixed episodes among", wgdnums(cands))
 
-        for wgd in best_wgd_nodes:
-            if wgd in fixed_wgd_nodes:
-                continue
-            # exclude present
+        for wgd in cands:
+                            
             current_wgdnodes = list(set(st.root.nodes()).difference([wgd]))            
 
             is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, current_wgdnodes, excludedoutgroup=outgroup)   
 
             if is_feasible:
-                print (f"Node {wgd.num} is not fixed episode. EC={len(used_wgd_nodes)}")
+                if verbose>=2: 
+                    print (f"Node {wgd.num} is not fixed episode. EC={len(used_wgd_nodes)}")
             else:
-                print (f"Node {wgd.num} {'(root) ' if not wgd.parent else '' }is fixed episode!")
+                if verbose>=2: 
+                    print (f"Node {wgd.num} {'(root) ' if not wgd.parent else '' }is fixed episode!")
                 if wgd in user_episodes:
-                    if verbose==2:
+                    if verbose>=2:
                         print(f"Fixed episode {wgd.num} in user episodes")                    
                 fixed_wgd_nodes.add(wgd)
+    else:
+        clean_fixed_episodes = False # search not performed
 
+
+    if len(fixed_wgd_nodes)>0:
+        if verbose>=1: 
+            print("Final list of fixed episodes:", wgdnums(fixed_wgd_nodes))
+            
+
+    ee_stats = []
+    ee_candidates_dict = {}
+    if extended_episodes_search:
+        ee_candidates = list(set(st.root.nodes()).difference(fixed_wgd_nodes))            
+
+        if verbose >= 1:    
+            print("Locating extended episodes among", wgdnums(ee_candidates))
+
+        for wgd in ee_candidates:
+            current_wgdnodes = fixed_wgd_nodes | {wgd}
+                        
+            embeddings = is_reconciled_using_wgd_withembedding(st, gt, current_wgdnodes, excludedoutgroup=outgroup)
+
+            if embeddings:
+
+                for n in st.nodes: n.episize=0                    
+
+                # set episize from embeddings data
+                embeddings.setepisize()            
+            
+                extepisize = wgd.episize
+                if verbose>=2: 
+                    print (f"Fixed episodes + {wgd.num}: node {wgd.num} eeepisize={wgd.episize} ")                    
+            else:
+                if verbose>=2: 
+                    print (f"Fixed episodes + {wgd.num}: no feasible solution (-1)")
+                extepisize = -1
+
+            ee_candidates_dict[wgd.num] = extepisize   
+
+        for n in st.nodes:  
+            delattr(n, 'episize') # clean                 
+            
     if locked_epi_support:        
         return st, fixed_wgd_nodes
 
@@ -1237,8 +1290,10 @@ def count_wgd_nodes(
     outstats+=f"genetree=\"{gt}\"\n"
     outstats+=f"{speciestreelab}=\"{st}\"\n"
     outstats+=f"{speciestreelab}fixedwgd=\"{st.root.markrepr(fixed_wgd_nodes)}\"\n"
-    outstats+=f"fixedwgd={len(fixed_wgd_nodes)}\n"
-    outstats+=f"userwgdepisodes={len(user_wgd_episodes)}\n"
+    outstats+=f"fixed_episodeslen={len(fixed_wgd_nodes)}\n"
+    outstats+=f"userwgdepisodeslen={len(user_wgd_episodes)}\n"
+    outstats+=f"fixed_episodes={wgdnums(fixed_wgd_nodes)}\n"
+    outstats+=f"userwgdepisodes={wgdnums(user_wgd_episodes)}\n"
     outstats+=f"reversed_climb={reversed_climb}\n"
     outstats+=f"unknownlabels={unklabs}\n"
 
@@ -1453,6 +1508,12 @@ def count_wgd_nodes(
         outstats+=f"samplingsets={samplingsets}\n"
         outstats+=f"outgenetree=\"{gt_inferred_str}\"\n"
 
+    if ee_candidates_dict:
+        for nodenum, v in ee_candidates_dict.items():
+            for n in stroot.nodes():
+                if n.num==nodenum:                    
+                    n.eeepisize = v
+
     if save_embedding:
         
         embeddings = is_reconciled_using_wgd_withembedding(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
@@ -1482,35 +1543,37 @@ def count_wgd_nodes(
     outstats+=f"exactsolution={exactsolution}\n"
     outstats+=f"unknownlabels={unklabs}\n"
 
+    
+
     if st.outgrouped():
 
         gt_wo = split_outgrouped_tree(Tree(str2tree(gt_inferred_str)), outgroup)        
         st_wo = Network(str2tree(stroot.netrepr()))        
 
-        if speciestreeonly:
+        # if speciestreeonly:
 
-            # recompute ec to get epicounts for wo
-            # only for trees
-            worec, ecn = reconcileEC(gt_wo, st_wo)
+        #     # recompute ec to get epicounts for wo
+        #     # only for trees
+        #     worec, ecn = reconcileEC(gt_wo, st_wo)            
 
-            # check correctness
-            a = 'episize'
-            for stn, st_won in zip(stroot.nodes(), st_wo.root.nodes()):
-                if hasattr(stn, a) and hasattr(st_won, a):
-                    if getattr(stn,a)!=getattr(st_won, a):
-                        raise Exception(f"Incorrect EC attribute {a} {getattr(stn,a)} {getattr(st_won,a)}")
-                    continue
+        #     # check correctness
+        #     a = 'episize'
+        #     for stn, st_won in zip(stroot.nodes(), st_wo.root.nodes()):
+        #         if hasattr(stn, a) and hasattr(st_won, a):
+        #             if getattr(stn,a)!=getattr(st_won, a):
+        #                 raise Exception(f"Incorrect EC attribute {a} {getattr(stn,a)} {getattr(st_won,a)}")
+        #             continue
 
-                if not hasattr(stn, a) and not hasattr(st_won, a):
-                    continue            
+        #         if not hasattr(stn, a) and not hasattr(st_won, a):
+        #             continue            
                 
-                if hasattr(st_won, a) and not st_won.episize: continue
+        #         if hasattr(st_won, a) and not st_won.episize: continue
 
-                raise Exception(f"Only one EC attribute present {a} {hasattr(stn,a)} {hasattr(st_won, a)} in {stn.attrrepr(epiattr,gsestyle=gsestyle)} {st_won.attrrepr(epiattr,gsestyle=gsestyle)}")
+        #         raise Exception(f"Only one EC attribute present {a} {hasattr(stn,a)} {hasattr(st_won, a)} in {stn.attrrepr(epiattr,gsestyle=gsestyle)} {st_won.attrrepr(epiattr,gsestyle=gsestyle)}")
 
-            outstats+=f"bestcost_worec={worec}\n"
-            if worec != best_cost-eccorrection:
-                reporterror(out_file, "Inconsistency in EC cost computation {worec} {best_cost-eccorrection}.", outstats)
+        #     outstats+=f"bestcost_worec={worec}\n"
+        #     if worec != best_cost-eccorrection:
+        #         reporterror(out_file, "Inconsistency in EC cost computation {worec} {best_cost-eccorrection}.", outstats)
 
         gt_inferred_str_wo = ";".join(str(t) for t in gt_wo )
 
@@ -1524,16 +1587,18 @@ def count_wgd_nodes(
             tr, distrsum = gtwithdistrmaps(st, gt, dpdistr, outgroup=outgroup, distr_counts=distr_counts)
             print(tr + f" distrsum={distrsum}")
 
-        
+    
 
         outstats+=f"outgenetrees_wo=\"{gt_inferred_str_wo}\"\n"        
-        outstats+=f"bestcost_wo={best_cost-eccorrection}\n"
+        outstats+=f"bestcost_wo={best_cost-eccorrection}\n"        
+
         outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr, gsestyle=gsestyle)}\"\n"
         outstats+=f"outspeciestree_worec=\"{st_wo.root.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
+        
 
 
     else:
         if distribution_maps:        
             outstats += getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
     
-    return best_cost, best_wgd_nodes, exactsolution, outstats
+    return best_cost, best_wgd_nodes, exactsolution, outstats, stroot, fixed_wgd_nodes if clean_fixed_episodes else []
