@@ -208,7 +208,7 @@ Identify which network nodes are required (locked) for reconciling each individu
 
 ```bash
 mkdir -p results
-python3 netec.py \  
+python3 netec.py \
     --gene_trees example_locked_epi/gene_trees  \
     --network example_locked_epi/species_tree  \
     --locked_epi_support \

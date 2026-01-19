@@ -84,8 +84,8 @@ class Network(Tree):
         # set outgroup data
         self.outgroup = outgroup
         if len(self.root.c)>1 and self.root.c[1].clusterleaf == outgroup:
-            self.trueroot = self.root.c[0]            
-        else:
+            self.trueroot = self.root.c[0]                        
+        else:            
             self.trueroot = self.root            
 
         for n in self.nodes:
@@ -96,6 +96,14 @@ class Network(Tree):
 
     def isdag(self):
         return sorttop([(n.num, c.num) for n in self.nodes for c in n.c])
+
+    def topologicalsort(self):
+        di = { n.num:n for n in self.nodes }
+        l = sorttop([(n.num, c.num) for n in self.nodes for c in n.c])
+        if l:
+            return [ di[i] for i in l ]
+        return []
+
 
     def istimeconsistent(self):
         lftparent_nums = []

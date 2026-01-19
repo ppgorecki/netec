@@ -939,7 +939,7 @@ def count_wgd_nodes_combined(
         out_basefile = None, # dir + base name of out file          
         noimprovement_stop=0,
         randomize_from=0,
-        setid=None,
+        setid="",
         reversed_climb = 0,
         initial_gene_tree = None,
         distribution_maps = False,
@@ -954,6 +954,7 @@ def count_wgd_nodes_combined(
         fixed_episodes = None,
         fixed_episodes_search = True,
         extended_episodes_search = False,
+        extended_episodes_from_fixedepi = False,
         locked_epi_support = False
         ) -> Tuple[float, Set[Node]]:
     """ 
@@ -1001,6 +1002,7 @@ def count_wgd_nodes_combined(
         fixed_episodes = fixed_episodes,
         locked_epi_support = locked_epi_support,
         extended_episodes_search = extended_episodes_search,
+        extended_episodes_from_fixedepi = extended_episodes_from_fixedepi,
         fixed_episodes_search = fixed_episodes_search)
 
 def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
@@ -1121,7 +1123,7 @@ def count_wgd_nodes(
         out_basefile=None,
         noimprovement_stop=0,
         randomize_from=0,
-        setid=None,
+        setid="",
         reversed_climb=0,
         initial_gene_tree = None,
         distribution_maps = False,
@@ -1136,6 +1138,7 @@ def count_wgd_nodes(
         fixed_episodes = None,
         fixed_episodes_search = True,
         extended_episodes_search = False,
+        extended_episodes_from_fixedepi = False,
         locked_epi_support = False,
         ) -> Tuple[float, Set[Node]]:
     """ 
@@ -1208,8 +1211,8 @@ def count_wgd_nodes(
 
     if fixed_episodes_search:
         cands = set(best_wgd_nodes).difference(fixed_wgd_nodes)
-        if verbose >=1:    
-            print("Locating additional fixed episodes among", wgdnums(cands))
+        if cands and verbose >=1:    
+            print(f"{setid}Locating additional fixed episodes among", wgdnums(cands))
 
         for wgd in cands:
                             
@@ -1219,13 +1222,13 @@ def count_wgd_nodes(
 
             if is_feasible:
                 if verbose>=2: 
-                    print (f"Node {wgd.num} is not fixed episode. EC={len(used_wgd_nodes)}")
+                    print (f"{setid}Node {wgd.num} is not fixed episode. EC={len(used_wgd_nodes)}")
             else:
                 if verbose>=2: 
-                    print (f"Node {wgd.num} {'(root) ' if not wgd.parent else '' }is fixed episode!")
+                    print (f"{setid}Node {wgd.num} {'(root) ' if not wgd.parent else '' }is fixed episode!")
                 if wgd in user_episodes:
                     if verbose>=2:
-                        print(f"Fixed episode {wgd.num} in user episodes")                    
+                        print(f"{setid}Fixed episode {wgd.num} in user episodes")                    
                 fixed_wgd_nodes.add(wgd)
     else:
         clean_fixed_episodes = False # search not performed
@@ -1233,19 +1236,21 @@ def count_wgd_nodes(
 
     if len(fixed_wgd_nodes)>0:
         if verbose>=1: 
-            print("Final list of fixed episodes:", wgdnums(fixed_wgd_nodes))
+            print(f"{setid}Final list of fixed episodes:", wgdnums(fixed_wgd_nodes))
             
 
-    ee_stats = []
-    ee_candidates_dict = {}
-    if extended_episodes_search:
-        ee_candidates = list(set(st.root.nodes()).difference(fixed_wgd_nodes))            
+    def extended_episodes_stats(st, wgdepisodes, fullsearch=False, infotext=""):
+
+        candidates = list(set(st.root.nodes()).difference(wgdepisodes))            
+        cands = {}
+
+        l = st.topologicalsort()
 
         if verbose >= 1:    
-            print("Locating extended episodes among", wgdnums(ee_candidates))
+            print(f"{setid}Locating extended episodes ({infotext})", wgdnums(candidates))
 
-        for wgd in ee_candidates:
-            current_wgdnodes = fixed_wgd_nodes | {wgd}
+        for wgd in candidates:
+            current_wgdnodes = wgdepisodes | {wgd}
                         
             embeddings = is_reconciled_using_wgd_withembedding(st, gt, current_wgdnodes, excludedoutgroup=outgroup)
 
@@ -1253,9 +1258,8 @@ def count_wgd_nodes(
 
                 for n in st.nodes: n.episize=0                    
 
-                # set episize from embeddings data
                 embeddings.setepisize()            
-            
+        
                 extepisize = wgd.episize
                 if verbose>=2: 
                     print (f"Fixed episodes + {wgd.num}: node {wgd.num} eeepisize={wgd.episize} ")                    
@@ -1264,10 +1268,21 @@ def count_wgd_nodes(
                     print (f"Fixed episodes + {wgd.num}: no feasible solution (-1)")
                 extepisize = -1
 
-            ee_candidates_dict[wgd.num] = extepisize   
+            cands[wgd.num] = extepisize   
 
         for n in st.nodes:  
-            delattr(n, 'episize') # clean                 
+            if hasattr(n, 'episize'):
+                delattr(n, 'episize') # clean                 
+
+        if fullsearch: 
+            return cands
+
+    ee_stats = []
+    ee_candidates_dict = {}
+
+    if extended_episodes_from_fixedepi:
+        ee_candidates_dict = extended_episodes_stats(st, fixed_wgd_nodes, True, "from fixedepi") # exec full search
+        
             
     if locked_epi_support:        
         return st, fixed_wgd_nodes
@@ -1281,10 +1296,6 @@ def count_wgd_nodes(
         print(st.root.markrepr(fixed_wgd_nodes))
 
     unklabs = len(gt.unknownlabels())
-
-    if "_" in setid:
-        # in case of more complex setids split
-        outstats+="".join(f"setid{i+1}={v}\n" for i,v in enumerate(setid.split("_")))
 
     outstats+=f"setid=\"{setid}\"\n"
     outstats+=f"genetree=\"{gt}\"\n"
@@ -1344,7 +1355,7 @@ def count_wgd_nodes(
     def getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup):
 
         if verbose:
-            print(f"[{setid}] Computing gene-species distribution maps")
+            print(f"{setid}Computing gene-species distribution maps")
 
         _, dpdistr = is_reconciled_using_wgd_withcounts(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
 
@@ -1374,7 +1385,7 @@ def count_wgd_nodes(
             wgd_node_set = set(user_wgd_episodes) | fixed_wgd_nodes
             
             if verbose:
-                print(f"[{setid}] EC:{best_cost}/{maxec} Test:UserEpisodes FxdWgd:{len(fixed_wgd_nodes)} UnknwnLbls:{unklabs}")
+                print(f"{setid}EC:{best_cost}/{maxec} Test:UserEpisodes FxdWgd:{len(fixed_wgd_nodes)} UnknwnLbls:{unklabs}")
 
             if verbose == 2:
                 print(f"DP start with WGD={wgdnums(wgd_node_set)}", end="...")                       
@@ -1385,12 +1396,12 @@ def count_wgd_nodes(
                 gt_inferred = Tree(str2tree(gt_inferred_str))
 
                 if verbose:
-                    print(f"[{setid}] Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec} ")
+                    print(f"{setid}Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec} ")
 
                 best_cost, best_wgd_nodes = len(used_wgd_nodes), used_wgd_nodes
             else:
                 if verbose:
-                    print(f"[{setid}] user episodes + fixed episodes are not feasible?")
+                    print(f"{setid}user episodes + fixed episodes are not feasible?")
 
         else:
 
@@ -1406,7 +1417,7 @@ def count_wgd_nodes(
                 else:
                     if best_cost == len(fixed_wgd_nodes):   
                         if verbose:
-                            print(f"[{setid}] Best cost = fixed wgds. Stop: {best_cost}/{maxec}")                                     
+                            print(f"{setid}Best cost = fixed wgds. Stop: {best_cost}/{maxec}")                                     
                         break                    
                     k = best_cost - len(fixed_wgd_nodes) - 1       
 
@@ -1415,7 +1426,7 @@ def count_wgd_nodes(
                 samplingsets = not (not randomize_from or randomize_from>comb)
           
                 if verbose:
-                    print(f"[{setid}] EC:{best_cost}/{maxec} Test:{k+len(fixed_wgd_nodes)} FxdWgd:{len(fixed_wgd_nodes)} PotentialEpi:{len(potential_wgd_nodes)} K:{k} Comb:{comb} RndSmpl:{samplingsets} StopAfter:{noimprovement_stop} UnknwnLbls:{unklabs}")
+                    print(f"{setid}EC:{best_cost}/{maxec} Test:{k+len(fixed_wgd_nodes)} FxdWgd:{len(fixed_wgd_nodes)} PotentialEpi:{len(potential_wgd_nodes)} K:{k} Comb:{comb} RndSmpl:{samplingsets} StopAfter:{noimprovement_stop} UnknwnLbls:{unklabs}")
                
                 if samplingsets:
                     wgd_node_sets = randcombinations(potential_wgd_nodes, k)
@@ -1447,7 +1458,7 @@ def count_wgd_nodes(
                         gt_inferred = Tree(str2tree(gt_inferred_str))
 
                         if verbose:
-                            print(f"[{setid}] Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec} ")
+                            print(f"{setid}Found feasible solution with wgd={len(used_wgd_nodes)}/{maxec} ")
 
                         if speciestreeonly:                                        
                             ec, used_ec_nodes = reconcileEC({gt_inferred}, st)
@@ -1456,7 +1467,7 @@ def count_wgd_nodes(
                                 raise Exception(f"Incorrect EC>DP cost {ec}>{used_wgd_nodes}")
 
                             if ec<len(used_wgd_nodes):
-                                print(f"[{setid}] Found EC solution with ec={len(ec)}/{maxec}")                            
+                                print(f"{setid}Found EC solution with ec={len(ec)}/{maxec}")                            
                             # Update from EC algorithm                        
                             best_cost, best_wgd_nodes = ec, used_ec_nodes
 
@@ -1481,7 +1492,7 @@ def count_wgd_nodes(
                         exactsolution = False # unknown
                         stop = True
                         if verbose:
-                            print(f"[{setid}] Stopping criterion reached (no exact solution). Stop with {best_cost}/{maxec}")                                     
+                            print(f"{setid}Stopping criterion reached (no exact solution). Stop with {best_cost}/{maxec}")                                     
                         break
                 else:   
                     # all combinations explored
@@ -1492,7 +1503,7 @@ def count_wgd_nodes(
                         exactsolution = True  # no solution located; accept current (exact)
                         stop = True
                         if verbose:
-                            print(f"[{setid}] All combinations explored. Stop with the current best cost: {best_cost}/{maxec}")
+                            print(f"{setid}All combinations explored. Stop with the current best cost: {best_cost}/{maxec}")
 
                 sampling_occured |= samplingsets # important in reverse climb
                 
@@ -1508,27 +1519,29 @@ def count_wgd_nodes(
         outstats+=f"samplingsets={samplingsets}\n"
         outstats+=f"outgenetree=\"{gt_inferred_str}\"\n"
 
-    if ee_candidates_dict:
+    if ee_candidates_dict:        
         for nodenum, v in ee_candidates_dict.items():
-            for n in stroot.nodes():
+            for n in st.root.nodes():
                 if n.num==nodenum:                    
-                    n.eeepisize = v
+                    n.eeepisize = v                   
+
+    best_wgd_nodes = sorted(best_wgd_nodes, key=lambda x: x.num)
 
     if save_embedding:
         
         embeddings = is_reconciled_using_wgd_withembedding(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
 
-        if not speciestreeonly:
+        #if not speciestreeonly:
             
-            for n in st.nodes:  
-                n.episize=0
-                n.epibestwgd = 0
+        for n in st.nodes:  
+            n.episize=0
+            n.epibestwgd = 0
 
-            for n in best_wgd_nodes:
-                n.epibestwgd = 1
+        for n in best_wgd_nodes:
+            n.epibestwgd = 1
 
-            # set episize from embeddings data
-            embeddings.setepisize()
+        # set episize from embeddings data
+        embeddings.setepisize()
 
         with open(f"{out_basefile}embedding","w") as f:
             if outgroup:
@@ -1542,6 +1555,7 @@ def count_wgd_nodes(
     outstats+=f"outspeciestree=\"{st.root.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
     outstats+=f"exactsolution={exactsolution}\n"
     outstats+=f"unknownlabels={unklabs}\n"
+    outstats+=f"best_wgd_nodes={wgdnums(best_wgd_nodes)}"
 
     
 
@@ -1594,11 +1608,15 @@ def count_wgd_nodes(
 
         outstats+=f"outspeciestree_wo=\"{stroot.attrrepr(epiattr, gsestyle=gsestyle)}\"\n"
         outstats+=f"outspeciestree_worec=\"{st_wo.root.attrrepr(epiattr,gsestyle=gsestyle)}\"\n"
-        
-
 
     else:
         if distribution_maps:        
             outstats += getdistrmaps(st, gt, best_wgd_nodes, reference_tree, outgroup)
-    
-    return best_cost, best_wgd_nodes, exactsolution, outstats, stroot, fixed_wgd_nodes if clean_fixed_episodes else []
+
+
+    if st.outgrouped() and st.root in best_wgd_nodes:
+        artificial_wgdroot = st.root
+    else:
+        artificial_wgdroot = None
+
+    return best_cost, best_wgd_nodes, exactsolution, outstats, stroot, fixed_wgd_nodes if clean_fixed_episodes else [], best_wgd_nodes, exactsolution, artificial_wgdroot
