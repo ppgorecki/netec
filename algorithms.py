@@ -953,6 +953,7 @@ def count_wgd_nodes_combined(
         user_episodes = None,
         fixed_episodes = None,
         fixed_episodes_search = True,
+        fixed_episodes_only = False,
         extended_episodes_search = False,
         extended_episodes_from_fixedepi = False,
         locked_epi_support = False
@@ -1000,6 +1001,7 @@ def count_wgd_nodes_combined(
         gsestyle = gsestyle,
         user_episodes = user_episodes,
         fixed_episodes = fixed_episodes,
+        fixed_episodes_only = fixed_episodes_only,
         locked_epi_support = locked_epi_support,
         extended_episodes_search = extended_episodes_search,
         extended_episodes_from_fixedepi = extended_episodes_from_fixedepi,
@@ -1136,6 +1138,7 @@ def count_wgd_nodes(
         gsestyle = False,
         user_episodes = None,
         fixed_episodes = None,
+        fixed_episodes_only = False,
         fixed_episodes_search = True,
         extended_episodes_search = False,
         extended_episodes_from_fixedepi = False,
@@ -1237,7 +1240,10 @@ def count_wgd_nodes(
     if len(fixed_wgd_nodes)>0:
         if verbose>=1: 
             print(f"{setid}Final list of fixed episodes:", wgdnums(fixed_wgd_nodes))
-            
+
+    if fixed_episodes_only:
+        return None, None, None, outstats, None, fixed_wgd_nodes if clean_fixed_episodes else [], None, None, None
+                    
 
     def extended_episodes_stats(st, wgdepisodes, fullsearch=False, infotext=""):
 

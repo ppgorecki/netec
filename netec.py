@@ -51,8 +51,6 @@ def main():
     parser.add_argument("--wgddebug", help="Print all tabs from DP programming run (debug)", action='store_true')
 
     parser.add_argument("--user_episodes", help="User defined list episodes as a list of node identifiers, e.g., '2 4 10', 'all' for all, or a file name); the computations are done only for the given set", type=str, default='')    
-
-
     parser.add_argument("--fixed_episodes", help="List of precomputed fixed episodes; use if episodes are known to optimize computations with --no_fixed_episodes_search False ", type=str, default='')   
 
     parser.add_argument("--no_fixed_episodes_search", help="Skip fixed episodes search (def. False)", action='store_true')
@@ -66,6 +64,9 @@ def main():
     parser.add_argument("--mindup", help="Filter gene trees with duplication count < MINDUP (only for networks with no reticulations, i.e., trees; ignored for networks); default is 0", type=int, default=0)
 
     parser.add_argument("--print_dup_stats", help="Print duplication statistics: for each k=0,1,2,... show how many gene trees have k duplications", action='store_true')
+
+    parser.add_argument("--fixed_episodes_only", help="Stop after fixed episodes phase", action='store_true')
+
 
     args = parser.parse_args()
 
@@ -205,9 +206,7 @@ def main():
                 outgroup="o",
                 verbose=args.verbose-1, # decrease
                 distr_counts=False,
-                gsestyle=args.gsestyle,
-                user_episodes = user_episodes,
-                fixed_episodes = fixed_episodes,
+                gsestyle=args.gsestyle,                
                 fixed_episodes_search = True,
                 locked_epi_support = True
             )
@@ -247,7 +246,8 @@ def main():
             fixed_episodes = fixed_episodes,
             fixed_episodes_search = fixed_episodes_search,
             extended_episodes_search = args.extended_episodes_search,           
-            extended_episodes_from_fixedepi = args.extended_episodes_from_fixedepi            
+            extended_episodes_from_fixedepi = args.extended_episodes_from_fixedepi,
+            fixed_episodes_only= args.fixed_episodes_only            
             )
 
 
@@ -268,17 +268,22 @@ def main():
                 if n.num == nnum:
                     n.lockedepisupport = v
 
+    if fixed_episodes: 
+        with open(out_basefile + "fixed_episodes","w") as f:
+            f.write(wgdnums(fixed_episodes,'',''))
+        if args.verbose>=2:                
+            print(f"{setid}Fixed episodes stored in fixed_episodes file")
+
+    if args.fixed_episodes_only:
+        return
+
+
     # Write output network (gse) and fixedwgd's    
     with open(out_basefile + "episummary" + outstyleext,"w") as f:
         f.write(stroot.attrrepr(epiattr, ignorezeros=False, gsestyle=args.gsestyle))
         if args.verbose>=2:
             print(f"{setid}Network with attributes saved in {out_basefile}episummary{outstyleext}")
 
-    if fixed_episodes: 
-        with open(out_basefile + "fixed_episodes","w") as f:
-            f.write(wgdnums(fixed_episodes,'',''))
-        if args.verbose>=2:                
-            print(f"{setid}Fixed episodes stored in fixed_episodes file")
 
     if best_wgd_nodes:         
         with open(out_basefile + "best_wgd_nodes" +("exact" if exactsolution else "approx"),"w") as f:
@@ -301,7 +306,7 @@ def main():
             print(f"{setid}Extended episode sizes (post):", " ".join(f"{b.num}:{b.eeepisizepost}" for b in stroot.nodes() if hasattr(b, "eeepisizepost")))
 
         if args.locked_epi_support:                        
-            print(f"{setid}Locked episode support:", " ".join(f"{b.num}:{b.lockedepisupport}" for b in best_wgd_nodes if hasattr(b, "lockedepisupport")))
+            print(f"{setid}Locked episode support:", " ".join(f"{b.num}:{b.lockedepisupport}" for b in stroot.nodes() if hasattr(b, "lockedepisupport")))
 
             
         # if args.extended_episodes_search:
