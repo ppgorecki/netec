@@ -51,6 +51,7 @@ def main():
     parser.add_argument("--wgddebug", help="Print all tabs from DP programming run (debug)", action='store_true')
 
     parser.add_argument("--user_episodes", help="User defined list episodes as a list of node identifiers, e.g., '2 4 10', 'all' for all, or a file name); the computations are done only for the given set", type=str, default='')    
+
     parser.add_argument("--fixed_episodes", help="List of precomputed fixed episodes; use if episodes are known to optimize computations with --no_fixed_episodes_search False ", type=str, default='')   
 
     parser.add_argument("--no_fixed_episodes_search", help="Skip fixed episodes search (def. False)", action='store_true')
@@ -66,6 +67,9 @@ def main():
     parser.add_argument("--print_dup_stats", help="Print duplication statistics: for each k=0,1,2,... show how many gene trees have k duplications", action='store_true')
 
     parser.add_argument("--fixed_episodes_only", help="Stop after fixed episodes phase", action='store_true')
+
+    parser.add_argument("--optimize", help="no: do not run DP algorithms; single: DP on fixed_episodes + user_episodes (opt.) just once; full: run full optimization algorithm (default)", 
+        type=str, default='full')
 
 
     args = parser.parse_args()
@@ -208,7 +212,8 @@ def main():
                 distr_counts=False,
                 gsestyle=args.gsestyle,                
                 fixed_episodes_search = True,
-                locked_epi_support = True
+                locked_epi_support = True,
+                optimize = 'none'
             )
             locked_episodes.append(locked_epi)            
 
@@ -247,7 +252,8 @@ def main():
             fixed_episodes_search = fixed_episodes_search,
             extended_episodes_search = args.extended_episodes_search,           
             extended_episodes_from_fixedepi = args.extended_episodes_from_fixedepi,
-            fixed_episodes_only= args.fixed_episodes_only            
+            fixed_episodes_only= args.fixed_episodes_only,
+            optimize=args.optimize            
             )
 
 

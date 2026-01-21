@@ -956,7 +956,8 @@ def count_wgd_nodes_combined(
         fixed_episodes_only = False,
         extended_episodes_search = False,
         extended_episodes_from_fixedepi = False,
-        locked_epi_support = False
+        locked_epi_support = False,
+        optimize = 'full',
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -1005,7 +1006,8 @@ def count_wgd_nodes_combined(
         locked_epi_support = locked_epi_support,
         extended_episodes_search = extended_episodes_search,
         extended_episodes_from_fixedepi = extended_episodes_from_fixedepi,
-        fixed_episodes_search = fixed_episodes_search)
+        fixed_episodes_search = fixed_episodes_search,
+        optimize=optimize)
 
 def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
 
@@ -1143,6 +1145,7 @@ def count_wgd_nodes(
         extended_episodes_search = False,
         extended_episodes_from_fixedepi = False,
         locked_epi_support = False,
+        optimize = 'full'
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -1177,10 +1180,14 @@ def count_wgd_nodes(
     outstats = f"initialgenetree={initial_gene_tree}\n"
     outstats += f"initialgenetreecost={best_cost}\n"
 
-    if speciestreeonly:
-        fixed_wgd_nodes = fixedec(gt, st)
-    else:        
-        fixed_wgd_nodes = fixedecnet(gt, st)           
+    if fixed_episodes_search:
+        if speciestreeonly:
+            fixed_wgd_nodes = fixedec(gt, st)
+        else:        
+            fixed_wgd_nodes = fixedecnet(gt, st)           
+    else:
+        fixed_wgd_nodes = set()
+
 
     for n in st.nodes:
         if hasattr(n, 'episize'):      
@@ -1229,7 +1236,7 @@ def count_wgd_nodes(
             else:
                 if verbose>=2: 
                     print (f"{setid}Node {wgd.num} {'(root) ' if not wgd.parent else '' }is fixed episode!")
-                if wgd in user_episodes:
+                if user_episodes and wgd in user_episodes:
                     if verbose>=2:
                         print(f"{setid}Fixed episode {wgd.num} in user episodes")                    
                 fixed_wgd_nodes.add(wgd)
@@ -1351,6 +1358,9 @@ def count_wgd_nodes(
     if not unklabs:
         exactsolution = True
 
+    if optimize == 'none' or optimize == 'single': 
+        exactsolution = "Unknown"
+
     def reporterror(out_file, info, outstats):
         f = open("netec.err.log","a")
         f.write(f"\n========={out_file}============\n")
@@ -1387,15 +1397,23 @@ def count_wgd_nodes(
        
     else:
 
-        if user_wgd_episodes:
-            wgd_node_set = set(user_wgd_episodes) | fixed_wgd_nodes
+        if verbose>=2:
+            print(f"{setid}Optimize mode: {optimize}")
+
+        if optimize=='single' or user_wgd_episodes:
+
+            if user_wgd_episodes:
+                wgd_node_set = set(user_wgd_episodes) | fixed_wgd_nodes
+            else:
+                wgd_node_set = set(fixed_wgd_nodes)
             
             if verbose:
                 print(f"{setid}EC:{best_cost}/{maxec} Test:UserEpisodes FxdWgd:{len(fixed_wgd_nodes)} UnknwnLbls:{unklabs}")
 
             if verbose == 2:
-                print(f"DP start with WGD={wgdnums(wgd_node_set)}", end="...")                       
-            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)   
+                print(f"{setid}DP start with WGD={wgdnums(wgd_node_set)}")     
+
+            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup, wgddebug=wgddebug)   
 
             if is_feasible:
                 gt_inferred_str = gt_inferred_str_cur                    
@@ -1409,7 +1427,7 @@ def count_wgd_nodes(
                 if verbose:
                     print(f"{setid}user episodes + fixed episodes are not feasible?")
 
-        else:
+        elif optimize=='full':
 
         # perform the search    
             while True: # prev while unklabls
@@ -1450,7 +1468,7 @@ def count_wgd_nodes(
 
                     if verbose == 2:
                         print(f"DP start with WGD={wgdnums(wgd_node_set)}", end="...")                       
-                    is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup)   
+                    is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup, wgddebug=wgddebug)   
 
                     if verbose == 2:
                         print(f" feasible={is_feasible} with {wgdnums(used_wgd_nodes)}")                       
@@ -1524,6 +1542,7 @@ def count_wgd_nodes(
         outstats+=f"climbs={climbs}\n"
         outstats+=f"samplingsets={samplingsets}\n"
         outstats+=f"outgenetree=\"{gt_inferred_str}\"\n"
+        outstats+=f"optimize=\"{optimize}\"\n"
 
     if ee_candidates_dict:        
         for nodenum, v in ee_candidates_dict.items():
