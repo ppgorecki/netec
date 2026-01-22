@@ -22,7 +22,7 @@ NetEC is partially based on the MetaEC tool https://bitbucket.org/pgor17/metaec 
 
 A Newick-formatted file containing the species tree or network topology.
 
-**Species tree example** (`data_sim/s_tree`):
+**Species tree example:**
 ```
 ((a,b),(c,d))
 ```
@@ -50,56 +50,40 @@ A text file with one gene tree per line in Newick format. Gene labels should mat
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree
+    --gene_trees example1/gene_trees \
+    --network example1/network
 ```
 
 **Output:**
 ```
-[] Cost: 1 Exact:True
+Cost: 1 Exact:True
+Best episodes: 2
 ```
 This shows that 1 duplication episode explains all gene tree duplications.
 
-### With Output File
+The result is saved in results dir, it will be created if not exists.
+
+### With Non-default Output Directory
 
 ```bash
-mkdir -p results
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --out_file results/output.log
+    --gene_trees example1/gene_trees \
+    --network example1/network \
+    --out_dir smp
 ```
 
-### With Output Dir (recommended)
-
-```bash
-mkdir -p results
-python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --out_file results
-```
+Results are saved to the specified directory (created if needed). Default output directory is `smp/`.
 
 ### With Verbose Output
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --verbose 2
 ```
 
-Use `--verbose 2` to print the WGD nodes used in the solution.
-
-## Working with Real Data (Yeast Dataset)
-
-```bash
-mkdir -p results
-python3 netec.py \
-    --gene_trees data_yeast/gtrees \
-    --network data_yeast/s_tree \
-    --out_file results
-```
+Use `--verbose 2` to print more detailed info.
 
 ## Working with Networks (Reticulations)
 
@@ -127,8 +111,8 @@ Filter out gene trees with fewer than N duplications:
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --mindup 2
 ```
 
@@ -138,8 +122,8 @@ Note: `--mindup` only works for trees (networks without reticulations).
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --print_dup_stats
 ```
 
@@ -154,74 +138,81 @@ Duplication statistics:
 
 ### User-Defined Episodes
 
-Specify which nodes to consider as potential duplication episodes:
+Specify which nodes to consider as potential duplication episodes. 
+Program adds needed fixed episodes, but full optimization is not executed (only single optimize mode - one DP run).
 
 ```bash
 # Consider specific nodes (by node numbers)
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --user_episodes "2 4 10"
 
 # Consider all nodes
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --user_episodes all
 ```
 
-### Save Episode Summary
+### Fixed Episodes
 
-Generate a species tree/network with episode size attributes:
+Provide precomputed fixed episodes to optimize computations:
 
 ```bash
-mkdir -p results
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --out_file results \
-    --episummaryfile
-cat results/episummary
+    --gene_trees example1/gene_trees \
+    --network example1/network \
+    --fixed_episodes "2 4" \
+    --no_fixed_episodes_search \
+    --verbose 2
 ```
+
+Use `--no_fixed_episodes_search` to skip automatic fixed episode detection when providing known episodes.
 
 ### Save Embedding
 
 Save the inferred gene-species mapping:
 
 ```bash
-mkdir -p results
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --out_file results \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
+    --out_dir results \
     --save_embedding
 cat results/embedding
 ```
 
+Episode summary is automatically saved to `<out_dir>/episummary.newick` (or `.gse` with `--gsestyle`).
+
+Important: always use --save_embedding if the size of episodes is needed (episize attribute).
+
 ### Extended Episode Analysis
 
-Identify non-fixed episode nodes that are good candidate to be episode.
+Identify non-fixed episode nodes that are good candidates to be episodes.
 
 ```bash
-python3 netec.py \  
-    --gene_trees example_extended_episodes/gene_trees  \
-    --network example_extended_episodes/network  \    
+python3 netec.py \
+    --gene_trees example2/gene_trees \
+    --network example2/network.newick \
     --extended_episodes_search
 ```
 
-Note that some the candidatte episode combinations have no feasible solution. Such a sitution is rare in practise.
+Extended episode sizes are saved as `eeepisizepost` attribute.
+
+Use `--extended_episodes_from_fixedepi` to identify non-fixed episodes with large number of duplications (saved as `eeepisize` attribute).
+
+Note that some candidate episode combinations have no feasible solution. Such a situation is rare in practice.
 
 ### Locked Episode Support Analysis
 
 Identify which network nodes are required (locked) for reconciling each individual gene tree:
 
 ```bash
-mkdir -p results
 python3 netec.py \
-    --gene_trees example_locked_epi/gene_trees  \
-    --network example_locked_epi/species_tree  \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --locked_epi_support \
-    --out_file results
 ```
 
 This generates two output files:
@@ -252,19 +243,24 @@ This generates two output files:
 - Understand which gene trees impose strict constraints on WGD placement
 - Low lockedepisupport may suggest removal gene trees that induce support at that node
 
-### Distribution Maps
+### Distribution Maps 
+
 
 Add distribution maps to the output:
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --distribution_maps \
     --print_distr_maps
 ```
 
+Use `--distr_counts` to output raw counts instead of normalized values.
+
 Note: use with species trees only (no reticulations in networks).
+
+TODO: implement with networks.
 
 ### Performance Optimization
 
@@ -272,8 +268,8 @@ For large datasets, use randomization to speed up computation:
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --randomize_from 1000 \
     --noimprovement_stop 50
 ```
@@ -287,10 +283,36 @@ Alternative search strategy starting from fixed WGD and expanding:
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
     --reversed_climb
 ```
+
+### Optimization Modes
+
+Control the optimization algorithm behavior:
+
+```bash
+# Full optimization (default)
+python3 netec.py \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
+    --optimize full
+
+# Single DP run on fixed + user episodes
+python3 netec.py \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
+    --optimize single
+
+# Skip DP algorithms entirely
+python3 netec.py \
+    --gene_trees example1/gene_trees \
+    --network example1/network \
+    --optimize no
+```
+
+Use `--fixed_episodes_only` to stop after the fixed episodes phase.
 
 ### GSE-Style Output
 
@@ -298,69 +320,161 @@ Use GSE format for output attributes:
 
 ```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --out_file results
+    --gene_trees example1/gene_trees \
+    --network example1/network \    
     --gsestyle
 ```
 
 ## Complete Example Workflow
 
+This section demonstrates a typical analysis workflow. For a complete real-world example, see the [Pandanales dataset](https://github.com/ppgorecki/NetEC-Pandanales.git).
+
+### Step 1: Identify Fixed Episodes
+
+Fixed episodes are WGD events that must occur at specific nodes to explain the gene tree duplications. Identifying them first optimizes all subsequent runs.
+
 ```bash
-# Create output directory
-mkdir -p results/sim results/yeast
-
-# 1. Analyze gene trees from simulation data
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --out_file results/sim \
-    --print_dup_stats \
-    --verbose 1
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir fixed \
+    --fixed_episodes_only \
+    --verbose 2
+```
 
-# 2. Analyze with episode summary output
-python3 netec.py \
-    --gene_trees data_yeast/gtrees \
-    --network data_yeast/s_tree \
-    --out_file results/yeast/ \
-    --episummaryfile \
-    --save_embedding
+### Step 2: Discovery Mode
 
-# 3. Filtering of low-duplication trees (for non-reticulation networks)
-for mindup in 1 2 3 4; do
+#### Infer Episodes
+
+Run after fixed episodes are identified:
+
+```bash
 python3 netec.py \
-    --gene_trees data_sim/wgd-1-gene-trees \
-    --network data_sim/s_tree \
-    --mindup $mindup \
-    --verbose 1 \
-    --out_file results/sim/mindup"$mindup".log
-done
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir disco \
+    --save_embedding \
+    --no_fixed_episodes_search \
+    --fixed_episodes "$(cat fixed/fixed_episodes)"
+```
+
+#### Search for Extended Episodes
+
+Identify additional candidate WGD nodes beyond the fixed episodes:
+
+```bash
+python3 netec.py \
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir discoext \
+    --extended_episodes_from_fixedepi \
+    --save_embedding \
+    --no_fixed_episodes_search \
+    --fixed_episodes "$(cat disco/best_wgd_nodesexact)" \
+    --optimize single
+```
+
+#### Extended Episodes Inference
+
+Add specific candidate episodes (e.g., node 21) to the analysis:
+
+```bash
+python3 netec.py \
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir discoext21 \
+    --locked_epi_support \
+    --extended_episodes_from_fixedepi \
+    --save_embedding \
+    --no_fixed_episodes_search \
+    --fixed_episodes "$(cat disco/best_wgd_nodesexact) 21" \
+    --optimize single \
+    --verbose 2
+```
+
+To test multiple candidate nodes (e.g., 19, 21, and both), run in parallel:
+
+```bash
+parallel python3 netec.py \
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir discoext"{1}" \
+    --extended_episodes_from_fixedepi \
+    --save_embedding \
+    --no_fixed_episodes_search \
+    --fixed_episodes "$(cat disco/best_wgd_nodesexact) {1}" \
+    --optimize single \
+    --verbose 2 \
+    ::: 19 21 "19 21"
+```
+
+### Step 3: Hypothesis-Driven Mode
+
+When you have prior hypotheses about WGD locations (e.g., from literature), test them directly.
+
+#### Define WGD Hypotheses
+
+```bash
+# Example: hypothesized WGD nodes from prior studies
+WGD="3 4 12 19 28"
+```
+
+#### Infer Episodes with Hypotheses
+
+```bash
+python3 netec.py \
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir hypo \
+    --save_embedding \
+    --no_fixed_episodes_search \
+    --fixed_episodes "$(cat fixed/fixed_episodes) $WGD"
+```
+
+#### Search for Extended Episodes
+
+```bash
+python3 netec.py \
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir hypoext \
+    --extended_episodes_from_fixedepi \
+    --save_embedding \
+    --no_fixed_episodes_search \
+    --fixed_episodes "$(cat hypo/best_wgd_nodesexact)" \
+    --optimize single
+```
+
+#### Extended Episodes Inference
+
+Add additional candidate episodes to the hypothesis:
+
+```bash
+python3 netec.py \
+    --network network.nwk \
+    --gene_trees gene_trees.nwk \
+    --out_dir hypoext21 \
+    --locked_epi_support \
+    --extended_episodes_from_fixedepi \
+    --save_embedding \
+    --no_fixed_episodes_search \
+    --fixed_episodes "$(cat hypo/best_wgd_nodesexact) 21" \
+    --optimize single \
+    --verbose 2
 ```
 
 ## Output Files
 
-When using `--out_file`, the following files may be generated:
+When using `--out_dir`, the following files are generated in the specified directory:
 
-- `<out_file>` or `<out_dir>/netec.log` - Main log with parameters and results
-- `<out_basefile>.embedding` - Gene-species embedding (with `--save_embedding`)
-- `<out_basefile>episummary` - Species tree with episode attributes (with `--episummaryfile`)
+- `netec.log` - Main log with parameters and results
+- `episummary.newick` (or `episummary.gse` with `--gsestyle`) - Species tree/network with episode attributes (always generated)
+- `embedding` - Gene-species embedding (with `--save_embedding`)
+- `fixed_episodes` - List of fixed episode node IDs
+- `best_wgd_nodesexact` or `best_wgd_nodesapprox` - Best WGD nodes (exact or approximate solution)
+- `locked_epi` - Locked episodes per gene tree (with `--locked_epi_support`)
+- `locked_epi_net.newick` - Network with locked episode support attributes (with `--locked_epi_support`)
 
-## Batch Processing
-
-For processing multiple gene tree files, see the example at:
-https://bitbucket.org/pgor17/pandanales
-
-Example shell script pattern:
-```bash
-for file in data_sim/wgd-1-gene-trees_*; do
-	DIR="results/$(basename $file)"
-	mkdir -p $DIR
-    python3 netec.py \
-        --gene_trees "$file" \
-        --network data_sim/s_tree \
-        --out_file $DIR
-done
-```
 
 ## Fasturec Integration
 
@@ -405,7 +519,8 @@ python3 netec.py \
 python3 netec.py \
     --network st.txt \
     --gene_trees gt.txt \
-    --mindup 4
+    --mindup 4 \
+    --out_dir results/fasturec
 ```
 
 Using `--mindup 4` filters out gene trees with fewer than 4 duplications, focusing the analysis on trees with more duplication signal.
