@@ -4,6 +4,9 @@ NetEC is a tool for inferring whole genome duplication (WGD) episodes by reconci
 
 Article (submitted): Górecki, P., Rutecka, N., Mykowiecka, A., Paszek, J., Episode Clustering in Phylogenetic Networks
 
+For examples and datasets from the above article, refer to:
+- https://github.com/ppgorecki/NetEC-Pandanales.git
+
 NetEC is partially based on the MetaEC tool https://bitbucket.org/pgor17/metaec for the inference of WGD events, jointly with missing gene-species assignments, but only for species trees. MetaEC references:
 - Górecki, P., Rutecka, N., Mykowiecka, A. et al. Unifying duplication episode clustering and gene-species mapping inference. Algorithms Mol Biol 19, 7 (2024). https://doi.org/10.1186/s13015-024-00252-8
 - Górecki, P., Rutecka, N., Mykowiecka, A., Paszek, J., Simultaneous reconstruction of duplication episodes and gene-species mappings, WABI 2023.
