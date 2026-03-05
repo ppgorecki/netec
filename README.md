@@ -6,10 +6,13 @@ Article (submitted): Górecki, P., Rutecka, N., Mykowiecka, A., Paszek, J., Epis
 
 For examples and datasets from the above article, refer to:
 - https://github.com/ppgorecki/NetEC-Pandanales.git
+- https://github.com/ppgorecki/NetEC-Simulations
 
 NetEC is partially based on the MetaEC tool https://bitbucket.org/pgor17/metaec for the inference of WGD events, jointly with missing gene-species assignments, but only for species trees. MetaEC references:
 - Górecki, P., Rutecka, N., Mykowiecka, A. et al. Unifying duplication episode clustering and gene-species mapping inference. Algorithms Mol Biol 19, 7 (2024). https://doi.org/10.1186/s13015-024-00252-8
 - Górecki, P., Rutecka, N., Mykowiecka, A., Paszek, J., Simultaneous reconstruction of duplication episodes and gene-species mappings, WABI 2023.
+
+Financial support was provided by the NCN grant 2023/51/B/ST6/02792.
 
 ## Requirements
 
