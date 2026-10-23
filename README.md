@@ -2,7 +2,7 @@
 
 NetEC is a tool for inferring whole genome duplication (WGD) episodes by reconciling gene trees with species trees or phylogenetic networks. It uses dynamic programming to find the minimum number of duplication episodes that explain the observed gene tree duplications.
 
-Article (submitted): Górecki, P., Rutecka, N., Mykowiecka, A., Paszek, J., Episode Clustering in Phylogenetic Networks
+Article: Górecki, P., Mykowiecka, A., Paszek, J., Episode Clustering in Phylogenetic Networks https://doi.org/10.1093/bioinformatics/btag445
 
 For examples and datasets from the above article, refer to:
 - https://github.com/ppgorecki/NetEC-Pandanales.git
@@ -536,3 +536,42 @@ For questions contact: <gorecki@mimuw.edu.pl>
 
 This work was supported by National Science Centre grant:
 - #2023/51/B/ST6/02792 (networks)
+
+## Reconciliation performance and compatibility tests
+
+The Newick parser uses a token deque. Feasibility and embedding DP evaluate
+memoized states on demand and reject mappings whose known gene species cannot
+occur below the network node (including paths through reticulations). Debug mode
+still populates the complete tables.
+
+For the standard outgroup-wrapped combination of multiple fully labelled gene
+trees, DP runs separately for each gene tree with one shared allowed episode set.
+This bounds the size of the DP tables. The synthetic root is accounted for in
+both feasibility and episode sizes. Unknown labels and nonstandard input layouts
+fall back to ordinary DP.
+
+During one search over fixed inputs, valid per-tree episode witnesses are reused
+only when contained in the next allowed episode set. This may select a different
+valid witness or a different tied optimal solution. It does not skip feasibility
+constraints or limit the exhaustive search. Cache state is not shared across
+separate searches. Short-lived DP cycles are collected between trees without
+permanently changing Python's garbage collector settings.
+
+**Search defaults remain unchanged:** `--randomize_from 0` and
+`--noimprovement_stop 0` (full search, no random sampling or trial limit).
+The experimental runtime's locking, completion markers, input normalization,
+and heuristic defaults are not part of the main implementation.
+
+Run the tests from this directory:
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+```
+
+The differential suite in `tests/test_optimizations.py` uses frozen original
+sources from commit `1b07c69652dbdb3a7bf73e92ab26417a462b8edb` in
+`tests/reference/`. It checks parsing, all episode subsets on small examples,
+reticulations, unknown labels, infeasible embeddings, embedding serialization
+and sizes, cache validity, debug output, GC restoration, and full-search CLI
+costs/defaults. It also compares two gene trees against six real input networks.
+These finite regression tests are not a general proof of equivalence.
