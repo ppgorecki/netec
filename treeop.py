@@ -1,4 +1,5 @@
 import sys
+from collections import deque
 from functools import reduce
 from random import randint, shuffle
 
@@ -55,22 +56,22 @@ def tokenizer(s):
 
 
 def str2tree(s):    
-    tok = tokenizer(s)
+    tok = deque(tokenizer(s))
 
     def _st(tok):
         if not tok:
             raise Exception("String too short..." % s)
         if tok[0] == '(':
-            tok.pop(0)
+            tok.popleft()
             c = [_st(tok)]
 
             while tok and tok[0] == ",":
-                tok.pop(0)
+                tok.popleft()
                 c.append(_st(tok))
 
             if tok[0] != ')':
                 raise Exception(") expected found <%s>" % tok[0])
-            tok.pop(0)
+            tok.popleft()
 
         else:
             c = []
@@ -78,7 +79,7 @@ def str2tree(s):
         # label and :...
         l = []
         while tok and tok[0] not in "(),":
-            l.append(tok.pop(0))
+            l.append(tok.popleft())
         return c, l
 
     if not tok:

@@ -1,5 +1,5 @@
 from treeop import Tree, str2tree
-from rec import rec
+from rec import reconcileEC as rec
 import pytest
 
 ST = Tree(str2tree("(((a,b),(c,d)),e)"))

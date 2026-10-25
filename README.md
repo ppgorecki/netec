@@ -188,7 +188,8 @@ cat results/embedding
 
 Episode summary is automatically saved to `<out_dir>/episummary.newick` (or `.gse` with `--gsestyle`).
 
-Important: always use --save_embedding if the size of episodes is needed (episize attribute).
+Use `--save_embedding` for baseline episode sizes (`episize`). Iterative extended
+analysis computes and saves its own episode sizes even without this flag.
 
 ### Extended Episode Analysis
 
@@ -206,6 +207,80 @@ Extended episode sizes are saved as `eeepisizepost` attribute.
 Use `--extended_episodes_from_fixedepi` to identify non-fixed episodes with large number of duplications (saved as `eeepisize` attribute).
 
 Note that some candidate episode combinations have no feasible solution. Such a situation is rare in practice.
+
+### Iterative Extended Episode Analysis (Algorithm 2)
+
+Run the post-evaluation from Section 3.3 / Algorithm 2 of `btag445.pdf`:
+
+```bash
+python3 netec.py \
+    --gene_trees example2/gene_trees \
+    --network example2/network.newick \
+    --extended_episodes_iterative \
+    --extended_episodes_tau 2 \
+    --out_dir results_iterative \
+    --save_embedding
+```
+
+The initial episode set `Q0` is the result of the usual inference. Compute the
+mean `e_bar` once from the embedding for `Q0`, over **all biological non-leaf
+network nodes**, including nodes of size zero and reticulations. The synthetic
+root and outgroup are excluded. If there are no non-leaf nodes, the mean is zero.
+This initial mean remains fixed for the entire analysis.
+
+Visit each biological node outside `Q0` once in postorder (children before
+parents; each reticulation visited once). Leaves are also candidates, as in
+`V(N) − Q` in Algorithm 2. For each candidate `s`, recompute sizes using the
+current `Q ∪ {s}` and add `s` immediately if its size is **strictly greater than**
+`tau * e_bar`. Later candidates therefore account for episodes already added.
+There is one pass; baseline episodes are retained even if their final size is
+zero. Sibling order is deterministic, by node ID.
+
+`--extended_episodes_tau` defaults to `2` and accepts finite nonnegative values.
+The new analysis is opt-in. Default inference still performs the full search,
+with `--randomize_from 0` and `--noimprovement_stop 0`.
+It cannot be combined with `--fixed_episodes_only`, `--print_dup_stats`, or an
+optimization mode other than `full` or `single`.
+
+Results in `--out_dir`:
+
+- `iterative_extended.json`: initial and final episode IDs, added IDs in acceptance
+  order, initial mean, fixed threshold, final sizes, and every candidate decision.
+- `iterative_episodes`: final episode IDs, including the synthetic root if present
+  in the baseline (the same convention as `best_wgd_nodesexact`). The JSON field
+  `biological_episodes` omits artificial nodes.
+- `iterative_added_episodes`: newly accepted episode IDs, in acceptance order.
+- `iterative_steps.tsv`: candidate size, fixed mean/threshold, decision, and episode
+  counts before and after each step. Counts include any artificial baseline episode.
+- `iterative_episummary.newick` (or `.gse` with `--gsestyle`): final `episize`,
+  baseline membership `epibestwgd`, final membership `iterative_episode`, and
+  acceptance step `iterative_added_step` (zero for nodes not added).
+- `iterative_embedding`: final embedding, only with `--save_embedding`.
+
+The ordinary baseline files, cost, and optimality status retain their original
+meaning. The extended set is a post-evaluation result and need not be minimal.
+Size evaluations process independent gene trees successively; candidate trials
+do not retain embeddings for the entire dataset. `size_dp_evaluations` counts
+whole-dataset size evaluations (initial set plus one per candidate), not calls
+for individual gene trees or optional embedding exports.
+
+To extend an already computed scenario without repeating the full search, use
+the same input files and node numbering:
+
+```bash
+python3 netec.py \
+    --gene_trees example2/gene_trees \
+    --network example2/network.newick \
+    --optimize single \
+    --user_episodes results/best_wgd_nodesexact \
+    --fixed_episodes results/fixed_episodes \
+    --no_fixed_episodes_search \
+    --extended_episodes_iterative \
+    --out_dir results_iterative
+```
+
+As in the existing `single` mode, `Q0` consists of the episodes used by the
+baseline DP witness for the supplied feasible scenario.
 
 ### Locked Episode Support Analysis
 

@@ -1,4 +1,7 @@
 import itertools
+from episode_batch import make_episode_batch, measure_episode_sizes
+from extended_episodes import (iterative_extended_analysis, validate_iterative_options,
+                               write_iterative_results)
 from typing import Set, Tuple, List
 from rec import reconcileEC, reconcileNetECapprox
 from fixedec import fixedec, fixedecnet
@@ -91,7 +94,23 @@ def pptabs3(st, gt, de, dd, si, deu, ddu, siu):
 
 
 
-def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, Set[Node], str]:
+def is_reconciled_using_wgd(st, gt, wgd_nodes, wgddebug=False, excludedoutgroup=""):
+    """Check feasibility, using bounded per-tree DP for standard combined inputs."""
+    batch = None if wgddebug else make_episode_batch(
+        st, gt, excludedoutgroup, _reconcile_single, _embedding_single)
+    check = batch.feasible if batch else _reconcile_single
+    return check(st, gt, wgd_nodes, wgddebug, excludedoutgroup)
+
+
+def is_reconciled_using_wgd_withembedding(st, gt, wgd_nodes, wgddebug=False, excludedoutgroup=""):
+    """Return an embedding (or None) with the same episode-counting interface."""
+    batch = None if wgddebug else make_episode_batch(
+        st, gt, excludedoutgroup, _reconcile_single, _embedding_single)
+    check = batch.embedding if batch else _embedding_single
+    return check(st, gt, wgd_nodes, wgddebug, excludedoutgroup)
+
+
+def _reconcile_single(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, Set[Node], str]:
     """
     Checks whether S and G can be reconciled using WGD events from a given set nodes of S
 
@@ -109,6 +128,7 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
         - str: a reconstructed gene tree (no ?) if exists
     """
 
+    reachable = {s: frozenset(n.label for n in s.leaves()) for s in st.nodes}
     deltav = {}
     delta_usage = {}
     delta_leafmap = {}
@@ -124,6 +144,9 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
             g not a leaf
             Return F U T
         """
+        if not wgddebug and not g.cluster.issubset(reachable[s]) and not any(x.startswith("?") for x in g.cluster):
+            return False, set(), tuple()
+
         if (s, g) in deltav:
             return deltav[s, g], delta_usage[s, g], delta_leafmap[s, g]
 
@@ -185,6 +208,9 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
             Return F U T
         """
 
+        if not wgddebug and not g.cluster.issubset(reachable[s]) and not any(x.startswith("?") for x in g.cluster):
+            return False, set(), tuple()
+
         if (s, g) in deltadownv:
             return deltadownv[s, g], deltadown_usage[s, g], deltadown_leafmap[s, g]
 
@@ -220,6 +246,9 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
         g maps to s and (g speciation or g a leaf)
         Return F T
         """
+        if not wgddebug and not g.cluster.issubset(reachable[s]) and not any(x.startswith("?") for x in g.cluster):
+            return False, set(), tuple()
+
         if (s, g) in sigmav:
             return sigmav[s, g], sigma_usage[s, g], sigma_leafmap[s, g]
 
@@ -258,9 +287,11 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
 
 
     
-    for (s,g) in itertools.product(st.nodes, gt.nodes):
-        delta_down(s,g)    
-        delta(s,g)    
+    # Debug tables retain the original complete state space.
+    if wgddebug:
+        for s, g in itertools.product(st.nodes, gt.nodes):
+            delta_down(s, g)
+            delta(s, g)
 
     is_valid, node_usage, leafmap = delta_down(st.root, gt.root)
     
@@ -273,7 +304,7 @@ def is_reconciled_using_wgd(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=F
 
 
 
-def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, Set[Node], str, str]:
+def _embedding_single(st: Tree, gt: Tree, wgd_nodes: Set[Node], wgddebug=False, excludedoutgroup="") -> Tuple[bool, Set[Node], str, str]:
 
     """
     Checks whether S and G can be reconciled using WGD events from a given set nodes of S
@@ -390,6 +421,7 @@ def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Nod
             
 
 
+    reachable = {s: frozenset(n.label for n in s.leaves()) for s in st.nodes}
     deltav = {}
     delta_usage = {}
     delta_leafmap = {}
@@ -410,6 +442,9 @@ def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Nod
             g not a leaf
             Return F U T
         """
+        if not wgddebug and not g.cluster.issubset(reachable[s]) and not any(x.startswith("?") for x in g.cluster):
+            return False, set(), tuple(), ""
+
         if (s, g) in deltav:
             return deltav[s, g], delta_usage[s, g], delta_leafmap[s, g], delta_embedding[s, g]
 
@@ -471,6 +506,9 @@ def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Nod
             Return F U T
         """
 
+        if not wgddebug and not g.cluster.issubset(reachable[s]) and not any(x.startswith("?") for x in g.cluster):
+            return False, set(), tuple(), ""
+
         if (s, g) in deltadownv:
             return deltadownv[s, g], deltadown_usage[s, g], deltadown_leafmap[s, g], deltadown_embedding[s, g]
 
@@ -515,6 +553,9 @@ def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Nod
         g maps to s and (g speciation or g a leaf)
         Return F T
         """
+        if not wgddebug and not g.cluster.issubset(reachable[s]) and not any(x.startswith("?") for x in g.cluster):
+            return False, set(), tuple(), ""
+
         if (s, g) in sigmav:
             return sigmav[s, g], sigma_usage[s, g], sigma_leafmap[s, g], sigma_embedding[s, g]
 
@@ -560,9 +601,11 @@ def is_reconciled_using_wgd_withembedding(st: Tree, gt: Tree, wgd_nodes: Set[Nod
 
 
     
-    for (s,g) in itertools.product(st.nodes, gt.nodes):
-        delta_down(s,g)    
-        delta(s,g)    
+    # Debug tables retain the original complete state space.
+    if wgddebug:
+        for s, g in itertools.product(st.nodes, gt.nodes):
+            delta_down(s, g)
+            delta(s, g)
 
     is_valid, node_usage, leafmap, embedding = delta_down(st.root, gt.root)
 
@@ -958,11 +1001,19 @@ def count_wgd_nodes_combined(
         extended_episodes_from_fixedepi = False,
         locked_epi_support = False,
         optimize = 'full',
+        extended_episodes_iterative = False,
+        extended_episodes_tau = 2.0,
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
      in order to reconcile S and a set of gene trees with ?
+
+    Optional iterative post-evaluation leaves the baseline return values intact;
+    its report is available as returned_stroot.iterative_extended_result.
     """
+
+    if extended_episodes_iterative:
+        validate_iterative_options(extended_episodes_tau, optimize, fixed_episodes_only)
 
     for g in gtrees:
         if not g.is_binary():
@@ -1007,7 +1058,9 @@ def count_wgd_nodes_combined(
         extended_episodes_search = extended_episodes_search,
         extended_episodes_from_fixedepi = extended_episodes_from_fixedepi,
         fixed_episodes_search = fixed_episodes_search,
-        optimize=optimize)
+        optimize=optimize,
+        extended_episodes_iterative=extended_episodes_iterative,
+        extended_episodes_tau=extended_episodes_tau)
 
 def gtwithdistrmaps(st, gt, dpdistr, reference_tree=None, outgroup: str = "outgroup", distr_counts=False ) -> str:
 
@@ -1145,7 +1198,9 @@ def count_wgd_nodes(
         extended_episodes_search = False,
         extended_episodes_from_fixedepi = False,
         locked_epi_support = False,
-        optimize = 'full'
+        optimize = 'full',
+        extended_episodes_iterative = False,
+        extended_episodes_tau = 2.0,
         ) -> Tuple[float, Set[Node]]:
     """ 
     Returns a minimal number of nodes in a species tree S that need to contain WGD events
@@ -1155,6 +1210,15 @@ def count_wgd_nodes(
         out_file - appends report results 
 
     """
+
+    if extended_episodes_iterative:
+        validate_iterative_options(extended_episodes_tau, optimize, fixed_episodes_only)
+
+    # Reuse witnesses only within this search over fixed input topologies.
+    batch = None if wgddebug else make_episode_batch(
+        st, gt, outgroup, _reconcile_single, _embedding_single)
+    check_wgd = batch.feasible if batch else _reconcile_single
+    check_embedding = batch.embedding if batch else _embedding_single
 
     #upper_bound = opttrees_gdscore(st, gt) if count_upper_bound else len(st.nodes) - 1
     
@@ -1228,7 +1292,7 @@ def count_wgd_nodes(
                             
             current_wgdnodes = list(set(st.root.nodes()).difference([wgd]))            
 
-            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, current_wgdnodes, excludedoutgroup=outgroup)   
+            is_feasible, used_wgd_nodes, gt_inferred_str_cur = check_wgd(st, gt, current_wgdnodes, excludedoutgroup=outgroup)
 
             if is_feasible:
                 if verbose>=2: 
@@ -1265,7 +1329,7 @@ def count_wgd_nodes(
         for wgd in candidates:
             current_wgdnodes = wgdepisodes | {wgd}
                         
-            embeddings = is_reconciled_using_wgd_withembedding(st, gt, current_wgdnodes, excludedoutgroup=outgroup)
+            embeddings = check_embedding(st, gt, current_wgdnodes, excludedoutgroup=outgroup)
 
             if embeddings:
 
@@ -1413,7 +1477,7 @@ def count_wgd_nodes(
             if verbose == 2:
                 print(f"{setid}DP start with WGD={wgdnums(wgd_node_set)}")     
 
-            is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup, wgddebug=wgddebug)   
+            is_feasible, used_wgd_nodes, gt_inferred_str_cur = check_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup, wgddebug=wgddebug)
 
             if is_feasible:
                 gt_inferred_str = gt_inferred_str_cur                    
@@ -1468,7 +1532,7 @@ def count_wgd_nodes(
 
                     if verbose == 2:
                         print(f"DP start with WGD={wgdnums(wgd_node_set)}", end="...")                       
-                    is_feasible, used_wgd_nodes, gt_inferred_str_cur = is_reconciled_using_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup, wgddebug=wgddebug)   
+                    is_feasible, used_wgd_nodes, gt_inferred_str_cur = check_wgd(st, gt, wgd_node_set, excludedoutgroup=outgroup, wgddebug=wgddebug)
 
                     if verbose == 2:
                         print(f" feasible={is_feasible} with {wgdnums(used_wgd_nodes)}")                       
@@ -1554,7 +1618,7 @@ def count_wgd_nodes(
 
     if save_embedding:
         
-        embeddings = is_reconciled_using_wgd_withembedding(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
+        embeddings = check_embedding(st, gt, best_wgd_nodes, excludedoutgroup=outgroup)
 
         #if not speciestreeonly:
             
@@ -1574,6 +1638,7 @@ def count_wgd_nodes(
                     f.write(f"&t {t}\n")
             else:
                 f.write(f"&t {t}\n")
+        del embeddings
     
     outstats+=f"bestcost={best_cost}\n"
     outstats+=f"dpcalls={dpcalls}\n"
@@ -1643,5 +1708,45 @@ def count_wgd_nodes(
         artificial_wgdroot = st.root
     else:
         artificial_wgdroot = None
+
+    if extended_episodes_iterative:
+        def measure(episodes):
+            if batch:
+                return batch.episode_sizes(st, gt, episodes, excludedoutgroup=outgroup)
+            return measure_episode_sizes(st, lambda: iter([
+                check_embedding(st, gt, episodes, excludedoutgroup=outgroup,
+                                wgddebug=wgddebug)]))
+
+        def report_step(step, total):
+            if verbose >= 2:
+                decision = 'added' if step['accepted'] else 'rejected'
+                print(f"{setid}Iterative extended {step['step']}/{total}: "
+                      f"node={step['node']} size={step['episode_size']} "
+                      f"threshold={step['threshold']:g} {decision}", flush=True)
+
+        if verbose:
+            print(f"{setid}Iterative extended analysis (tau={extended_episodes_tau:g}, "
+                  "fixed initial mean)", flush=True)
+        report = iterative_extended_analysis(st, best_wgd_nodes, measure,
+                                            extended_episodes_tau, report_step)
+        report['baseline_cost'] = best_cost
+        report['baseline_exact'] = exactsolution
+        stroot.iterative_extended_result = report
+        outstats += f"\niterative_tau={report['tau']}\n"
+        outstats += f"iterative_initial_mean={report['baseline_mean_nonleaf_size']}\n"
+        outstats += f"iterative_threshold={report['threshold']}\n"
+        outstats += f"iterative_added_episodes={report['added_episodes']}\n"
+        outstats += f"iterative_episodes={report['episodes']}\n"
+        outstats += f"iterative_size_dp_evaluations={report['size_dp_evaluations']}\n"
+        if out_basefile:
+            write_iterative_results(report, st, out_basefile, gsestyle)
+            if save_embedding:
+                final_ids = set(report['episodes'])
+                final_episodes = {n for n in st.nodes if n.num in final_ids}
+                final_embedding = check_embedding(st, gt, final_episodes,
+                                                  excludedoutgroup=outgroup)
+                with open(f"{out_basefile}iterative_embedding", 'w') as stream:
+                    for tree in final_embedding.embeddings(st.root):
+                        stream.write(f"&t {tree}\n")
 
     return best_cost, best_wgd_nodes, exactsolution, outstats, stroot, fixed_wgd_nodes if clean_fixed_episodes else [], best_wgd_nodes, exactsolution, artificial_wgdroot

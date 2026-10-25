@@ -3,6 +3,7 @@
 import argparse
 
 from algorithms import count_wgd_nodes_combined, epiattr, wgdnums
+from extended_episodes import validate_iterative_options
 from treeop import str2tree, Tree
 from netop import Network
 import time
@@ -60,6 +61,10 @@ def main():
 
     parser.add_argument("--extended_episodes_from_fixedepi", help="Identify non-fixed episodes with large number of duplications; saved as eeepisize attribute", action='store_true')    
 
+    parser.add_argument("--extended_episodes_iterative", help="Run Algorithm 2 after baseline inference: one postorder pass with immediate episode additions and a fixed initial mean", action='store_true')
+
+    parser.add_argument("--extended_episodes_tau", help="Nonnegative threshold multiplier for iterative analysis (default: 2); accept size > tau * initial non-leaf mean", type=float, default=2.0)
+
     parser.add_argument("--locked_epi_support", help="For every gene tree and every net node identify locked episodes; saved as lockedepisupport attribute",  action='store_true')
 
     parser.add_argument("--mindup", help="Filter gene trees with duplication count < MINDUP (only for networks with no reticulations, i.e., trees; ignored for networks); default is 0", type=int, default=0)
@@ -73,6 +78,15 @@ def main():
 
 
     args = parser.parse_args()
+
+    if args.extended_episodes_iterative:
+        try:
+            validate_iterative_options(args.extended_episodes_tau, args.optimize,
+                                       args.fixed_episodes_only)
+            if args.print_dup_stats:
+                raise ValueError('--extended_episodes_iterative cannot be combined with --print_dup_stats')
+        except ValueError as error:
+            parser.error(str(error))
 
     outstyleext = ".gse" if args.gsestyle else ".newick"
 
@@ -253,7 +267,10 @@ def main():
             extended_episodes_search = args.extended_episodes_search,           
             extended_episodes_from_fixedepi = args.extended_episodes_from_fixedepi,
             fixed_episodes_only= args.fixed_episodes_only,
-            optimize=args.optimize            
+            optimize=args.optimize,
+            **(dict(extended_episodes_iterative=True,
+                    extended_episodes_tau=args.extended_episodes_tau)
+               if args.extended_episodes_iterative else {})
             )
 
 
@@ -301,6 +318,15 @@ def main():
             print(f"{setid}Artificial WGD root id:", artificial_wgdroot.num)
 
         print(f"{setid}Best episodes: {wgdnums(best_wgd_nodes,'','')}")
+
+        if args.extended_episodes_iterative:
+            report = stroot.iterative_extended_result
+            print(f"{setid}Iterative extended episodes (biological): "
+                  + ' '.join(map(str, report['biological_episodes'])))
+            print(f"{setid}Iterative added episodes: "
+                  + ' '.join(map(str, report['added_episodes'])))
+            print(f"{setid}Iterative threshold: {report['threshold']:g} "
+                  f"(initial mean {report['baseline_mean_nonleaf_size']:g})")
 
         if args.save_embedding:                
             print(f"{setid}Episode sizes:", " ".join(f"{b.num}:{b.episize}" for b in best_wgd_nodes if hasattr(b, "episize")))
